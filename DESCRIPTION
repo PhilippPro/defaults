@@ -1,0 +1,9 @@
+Package: defaults
+Title: Calculate default settings
+Version: 0.0.0.1
+Authors@R: person("Philipp", "Probst", email = "philipp_probst@gmx.de", role = c("aut", "cre"))
+Description: Calculate defaults based on results of the OpenML bot.
+Depends: R (>= 3.3.3)
+License: GPL-2
+Encoding: UTF-8
+LazyData: true
