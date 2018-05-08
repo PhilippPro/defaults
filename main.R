@@ -2,8 +2,6 @@ library(devtools)
 library(stringi)
 load_all()
 
-
-
 # Get file from the figshare repository
 load(url("https://ndownloader.figshare.com/files/10462297"))
 
@@ -16,14 +14,15 @@ surrogate.mlr.lrn = makeLearner("regr.ranger",
   par.vals = list(num.trees = 2000, respect.unordered.factors = "order", num.threads = 4))
 
 k = 1 # auc
+scaling = "none"
 for(i in seq_along(learner.names)) {
   sprintf("Learner %i: %s", i, learner.names[i])
   set.seed(199 + i)
   # Surrogate model calculation
   surrogates = makeSurrogateModels(measure = measures[[k]], learner.name = learner.names[i], 
     data.ids = data.ids, tbl.results, tbl.metaFeatures, tbl.hypPars, lrn.par.set, surrogate.mlr.lrn,
-    scale_before = TRUE, scaling = "none")
-  save(surrogates, file = paste0("surrogates_", measures[k]$id, "_", i, ".RData"))
+    scale_before = TRUE, scaling = scaling)
+  saveRDS(surrogates, file = paste0("surrogates/", stri_sub(learner.names[i], from = 5), measures[k]$id, "_scale_", scaling, ".RDS"))
 }
 
 
