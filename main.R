@@ -1,29 +1,29 @@
 library(devtools)
-
+library(stringi)
 load_all()
-lrn.par.set = getMultipleLearners()
+
+
 
 # Get file from the figshare repository
 load(url("https://ndownloader.figshare.com/files/10462297"))
 
-
+lrn.par.set = getMultipleLearners()
 data.ids = sort(unique(tbl.results$data_id))
-library(stringi)
-learner.names = paste0("mlr.", names(lrn.par.set))
-learner.names = stri_sub(learner.names, 1, -5)
-measures = c("auc", "accuracy", "brier")
+learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.set)), 1, -5)
+measures = list(auc, acc, brier)
 
-surrogate.mlr.lrn = makeLearner("regr.ranger", par.vals = list(num.trees = 2000, respect.unordered.factors = "order", num.threads = 4))
+surrogate.mlr.lrn = makeLearner("regr.ranger",
+  par.vals = list(num.trees = 2000, respect.unordered.factors = "order", num.threads = 4))
 
 k = 1 # auc
-
 for(i in seq_along(learner.names)) {
-  print(i)
+  sprintf("Learner %i: %s", i, learner.names[i])
   set.seed(199 + i)
   # Surrogate model calculation
-  surrogates = makeSurrogateModels(measure.name = measures[k], learner.name = learner.names[i], 
-    data.ids = data.ids, tbl.results, tbl.metaFeatures, tbl.hypPars, lrn.par.set, surrogate.mlr.lrn)
-  save(surrogates, file = paste0("surrogates_", measures[k], "_", i, ".RData"))
+  surrogates = makeSurrogateModels(measure = measures[[k]], learner.name = learner.names[i], 
+    data.ids = data.ids, tbl.results, tbl.metaFeatures, tbl.hypPars, lrn.par.set, surrogate.mlr.lrn,
+    scale_before = TRUE, scaling = "none")
+  save(surrogates, file = paste0("surrogates_", measures[k]$id, "_", i, ".RData"))
 }
 
 
