@@ -11,7 +11,7 @@ learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.set)), 1, -5)
 measures = list(auc, acc, brier)
 
 surrogate.mlr.lrn = makeLearner("regr.ranger",
-  par.vals = list(num.trees = 2000, respect.unordered.factors = "order", num.threads = 4))
+  par.vals = list(num.trees = 2000, respect.unordered.factors = "order", num.threads = 32))
 
 k = 1 # auc
 scaling = "none"
