@@ -3,28 +3,29 @@
 # @param param.set parameter set
 # @param defaults.perf = performances of defaults 1, ..., n-1.
 # @param q Quantile we want to optimize
-doFocusSearch = function (surrogates, param.set, defaults.perf = NULL, q = 0.5) {
-  # Compute quantile of the predictions
-  fn = function(prd, defaults.perf, q) {
+doFocusSearch = function (surrogates, defaults.perf = NULL, q = 0.5) {
+  # Compute minimum of prediction and earlier defaults
+  fn = function(prd, defaults.perf) {
     prd.min = apply(cbind(prd, defaults.perf), 1, min)
-    quantile(prd.min, q = q)
   }
+  # Predict newdata, compute prediction
   f = function(x, surrogates, defaults.perf, q) {
     prds = sapply(surrogates$surrogates, function(surr) {
-      browser()
       prd = predict(surr, newdata = x)$data$response
-      qs = apply(prd, 1, fn, defaults.perf = defaults.perf, q = q)
+      parmin = sapply(prd, fn, defaults.perf = defaults.perf)
+      quantile(parmin, q = q)
     })
   }
-  ctrl = makeFocusSearchControl(maxit = 2, restarts = 1, points = 10)
-  z = focussearch(f, surrogates$param.set, ctrl, surrogates, defaults.perf = defaults.perf, q = q)
+  ctrl = makeFocusSearchControl(maxit = 5, restarts = 5, points = 100)
+  z = focussearch(f, surrogates$param.set, ctrl, surrogates = surrogates, defaults.perf = defaults.perf, q = q)
+  z$dsperfs = sapply(surrogates$surrogates, function(m) {predict(m, newdata = z$x)$data$response})
+  return(z)
 }
 
-doFocusSearch(surrogates = )
+# doFocusSearch(surrogates)
 #
 LOOCV = function(i, surrogates) {
   surr = surrogates$surrogates[-i]
-  calculateDefaultForward(surrogates, n.default = 10)
   # FIXME: How do we do the evaluation?
   # Option a: On surrogate
   # Option b: On real task
@@ -36,7 +37,7 @@ calculateDefaultForward = function(surrogates, n.default = 10) {
   surr = surrogates$surrogates
   param.set = surrogates$param.set
 
-  
+  # LOOCV
   inds = seq_len(length(surrogates$surrogates))
   sapply(inds, function(x) LOOCV)
   
