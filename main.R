@@ -1,17 +1,26 @@
 library(devtools)
 library(stringi)
+# install_github("berndbischl/focussearch")
+library(focussearch)
 load_all()
 
+# ----
 # Get file from the figshare repository
 load(url("https://ndownloader.figshare.com/files/10462297"))
+data.ids = sort(unique(tbl.results$data_id))
 
 lrn.par.set = getMultipleLearners()
-data.ids = sort(unique(tbl.results$data_id))
 learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.set)), 1, -5)
+
+# Possible measures
 measures = list(auc, acc, brier)
+# Possible scalings
+scaling = c("none", "logit", "zscale", "scale01")
 
 surrogate.mlr.lrn = makeLearner("regr.ranger",
-  par.vals = list(num.trees = 2000, respect.unordered.factors = "order", num.threads = 32))
+  # We use the defautls from Philips paper.
+  par.vals = list(num.trees = 2000, respect.unordered.factors = "order", num.threads = 32,
+                  replace = FALSE, sample.fraction = 0.751))
 
 k = 1 # auc
 scaling = "none"
@@ -23,16 +32,18 @@ for(i in seq_along(learner.names)) {
     data.ids = data.ids, tbl.results, tbl.metaFeatures, tbl.hypPars, lrn.par.set, surrogate.mlr.lrn,
     scale_before = TRUE, scaling = scaling)
   saveRDS(surrogates, file = paste0("surrogates/", stri_sub(learner.names[i], from = 5), measures[k]$id, "_scale_", scaling, ".RDS"))
+  gc()
 }
 
 
 # Forward selection
 defaults = list()
+files = list.files("surrogates")
 
 for(i in seq_along(learner.names)) {
   print(i)
   set.seed(199 + i)
-  load(paste0("surrogates_", measures[k], "_", i, ".RData"))
+  surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
   # Default calculation
   defaults[[length(defaults) + 1]] = calculateDefaultForward(surrogates, n.points = 100000, n.default = 10)
 }

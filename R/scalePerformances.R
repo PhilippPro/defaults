@@ -12,8 +12,8 @@ scalePerformances = function(table, measure, scaling = "none") {
   table = switch(scaling,
     none = table,
     logit = logit(table),
-    znormalize = zNormalize(table),
-    zeroonescale = zeroOneScale(table),
+    zscale = zNormalize(table),
+    scale01 = zeroOneScale(table),
     table
     )
   return(table)

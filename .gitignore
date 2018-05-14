@@ -4,5 +4,6 @@
 .Ruserdata
 *.Rproj
 *.RDS
-
+*.feather
+*.zip
 *.Rbuildignore
