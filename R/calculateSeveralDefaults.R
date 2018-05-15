@@ -1,11 +1,69 @@
-# Create an objective function that only requires inputs x and defaults.perf
+# Calculate default hyperparameter setting
+# @param surrogates Surrogate models
+# @param par.set Parameter set
+# @param n.defauls How many defaults
+# @param probs Quantile to optimize
+defaultForward = function(surrogates, par.set, n.defaults = 10, probs = 0.5) {
+  # Create the objective function
+  pfun = makeObjFunction(surrogates, probs)
+  
+  # Instantiate default parameters and respective performances
+  defaults.perf = NULL
+  defaults.params = NULL
+  
+  # Compute n.defaults  default parameters iteratively
+  # Earlier found defaults influence later performances
+  for (j in seq_len(n.defaults)) {
+    # Search for optimal points given previous defaults
+    z = focusSearchDefaults(pfun, surrogates, par.set, defaults.perf = defaults.perf)
+    catf("New best y: %f found for x: %s", z$y, paste0(z$x, collapse = ","))
+    # Add optimal point to defaults
+    defaults.perf = cbind(defaults.perf, z$dsperfs)
+    defaults.params = rbind(defaults.params, z$x)
+  }
+  return(defaults.params)
+}
+
+# Calculate LOOCV Performance of forward focusSearch
+# @param surrogates Surrogate models
+# @param n.defauls How many defaults
+# @param probs Quantile to optimize
+defaultLOOCV = function(surrogates, n.defaults = 10, probs = 0.5) {  
+  # Do LOOCV
+  inds = seq_len(length(surrogates$surrogates))
+  lst = lapply(inds, loocvIter, surrogates, n.defaults, probs)
+  # cummulative min (we choose the best default from a set of n defaults)
+  y.cummin = apply(extractSubList(lst, "y"), 2, cummin)
+  # Compute mean over resample iters
+  y.mean = setNames(apply(y.cummin, 1, mean), paste0("def", seq_len(n.defaults)))
+  return(y.mean)
+}
+
+# # Do a single Leave-One-Out CV Iteration
+# @param i Surrogate id to drop in this iteration
+# @param surrogates List of surrogates
+# @param n.defaults How many defaults to learn
+# @param probs Quantile we want to optimize
+loocvIter = function(i, surrogates, n.defaults, probs) {
+  catf("LOOCV iter: %i", i)
+  # Do the forward search
+  defaults.params = defaultForward(surrogates$surrogates[-i], surrogates$param.set, n.defaults, probs)
+  # FIXME: How do we do the evaluation?
+  # Now: On surrogate / Option b: On real task
+  prd.hout = predict(surrogates$surrogates[[i]], newdata = defaults.params)$data$response
+  return(list("y" = prd.hout, "x" = defaults.params))
+}
+
+# Create an objective function that only requires inputs x (algorithm hyperpars) and defaults.perf (other defaults)
+# @param surrogates List of surrogates
+# @param probs Quantile we want to optimize
 makeObjFunction = function(surrogates, probs) {
   force(surrogates)
   force(probs)
   # Predict newdata, compute prediction
   function (x, defaults.perf = NULL) {
     # Compute predicitons for each surrogate
-    prds = sapply(surrogates$surrogates, function(surr) {
+    prds = sapply(surrogates, function(surr) {
       predict(surr, newdata = x)$data$response
     })
     # For each row in prds.
@@ -21,72 +79,15 @@ makeObjFunction = function(surrogates, probs) {
 
 
 # Search for nth default
-# @param surrogates list of models
-# @param param.set parameter set
+# @param pfun Objective function
+# @param param.set Parameter set
 # @param defaults.perf = performances of defaults 1, ..., n-1.
-# @param probs Quantile we want to optimize
-doFocusSearch = function (surrogates, defaults.perf = NULL, probs = 0.5) {
-  
-  ctrl = makeFocusSearchControl(maxit = 5, restarts = 5, points = 10)
-  z = focussearch(pfun, surrogates$param.set, ctrl, show.info = TRUE, defaults.perf = defaults.perf)
-  z$dsperfs = sapply(surrogates$surrogates, function(m) {predict(m, newdata = z$x)$data$response})
+focusSearchDefaults = function (pfun, surrogates, param.set, defaults.perf) {
+  ctrl = makeFocusSearchControl(maxit = 4, restarts = 5, points = 100)
+  z = focussearch(pfun, param.set, ctrl, show.info = FALSE, defaults.perf = defaults.perf)
+  z$dsperfs = sapply(surrogates, function(m) {predict(m, newdata = z$x)$data$response})
   return(z)
 }
 
-# # Do a single Leave-One-Out CV Iteration
-# @param i Surrogate id to drop in this iteration
-# @param surrogates List of surrogates
-# @param n.defaults How many defaults to learn
-loocvIter = function(i, surrogates, n.defaults, probs = 0.5) {
-  hout.surr = surrogates$surrogates[[i]]
-  # Drop the i-th surrogate
-  pfun = makeObjFunction(surrogates$surrogates[-i], probs = 0.5)
-  defaults.perf = NULL
-  defaults = NULL
-  for (j in seq_len(n.defaults)) {
-    # Search for optimal points given previous defaults
-    z = doFocusSearch(pfun, defaults.perf = defaults.perf)
-    catf("New best y: %f found for x: %s \n", z$y, paste0(z$x, collapse = ","))
-    # Add optimal point to defaults
-    defaults.perf = cbind(defaults.perf, z$dsperfs)
-    defaults = cbind(defaults, z$x)
-  }
-  # FIXME: How do we do the evaluation?
-  # Option a: On surrogate
-  # Option b: On real task
-  predict(hout.surr, newdata = z$x)$data$response
-}
 
-# Calculate default hyperparameter setting
-# @param surrogates Surrogate models
-calculateDefaultForward = function(surrogates, n.default = 10) {
-  surr = surrogates$surrogates
-  param.set = surrogates$param.set
 
-  # LOOCV
-  inds = seq_len(length(surrogates$surrogates))
-  sapply(inds, function(x) LOOCV)
-  
-
-  # Best default in general
-  # average_preds = apply(preds, 1, mean)
-  # best = which(average_preds == max(average_preds))[1]
-  # Now we obtain a matrix with the predictions.
-  best = matrixAggregator(perf)
-  default = rnd.points[best,, drop = FALSE]
-  rownames(default) = NULL
-  
-  # Second best default
-  
-  for(i in 1:n.default) {
-    print(paste("iteration", i, "of", n.default))
-    average_preds_new = apply(preds, 1, function(x) mean(apply(rbind(preds[best,], x), 2, max)))
-    best2 = which(average_preds_new == max(average_preds_new))[1]
-    best = c(best, best2)
-    default = rnd.points[best,, drop = FALSE]
-    print(paste("Maximum", round(average_preds_new[which(average_preds_new == max(average_preds_new))], 4)))
-  }
-  list(default = default, result = preds[best, ])
-  
-  # Default calculation with LOOCV
-}

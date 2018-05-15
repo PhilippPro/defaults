@@ -37,13 +37,18 @@ for(i in seq_along(learner.names)) {
 # Forward selection
 defaults = list()
 files = list.files("surrogates")
+i = 2
+surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
+surrogates$surrogates = surrogates$surrogates[1:10]
+defaultLOOCV(surrogates, n.defaults = 2, probs = 0.5)
 
 for(i in seq_along(learner.names)) {
-  print(i)
+  catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
+  # Read surrogates from Hard Drive
   surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
   # Default calculation
-  defaults[[length(defaults) + 1]] = calculateDefaultForward(surrogates, n.points = 100000, n.default = 10)
+  defaults[[i]] = defaultLOOCV(surrogates, n.defaults = 2, probs = 0.5)
 }
 names(defaults) = stri_sub(learner.names, 13, 100)
 
