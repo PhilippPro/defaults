@@ -1,34 +1,60 @@
+# Create an objective function that only requires inputs x and defaults.perf
+makeObjFunction = function(surrogates, probs) {
+  force(surrogates)
+  force(probs)
+  # Predict newdata, compute prediction
+  function (x, defaults.perf = NULL) {
+    # Compute predicitons for each surrogate
+    prds = sapply(surrogates$surrogates, function(surr) {
+      predict(surr, newdata = x)$data$response
+    })
+    # For each row in prds.
+    ds_quantile = apply(prds, 1, function(x, defaults.perf, probs) {
+      # Compute min of prd and defaults.perf
+      parmin = apply(cbind(x, defaults.perf), 1, min)
+      # and compute quantile over the datasets
+      quantile(parmin, probs = probs)
+    }, defaults.perf = defaults.perf, probs = probs)
+    return(ds_quantile)
+  }
+}
+
+
 # Search for nth default
 # @param surrogates list of models
 # @param param.set parameter set
 # @param defaults.perf = performances of defaults 1, ..., n-1.
-# @param q Quantile we want to optimize
-doFocusSearch = function (surrogates, defaults.perf = NULL, q = 0.5) {
-  # Compute minimum of prediction and earlier defaults
-  fn = function(prd, defaults.perf) {
-    prd.min = apply(cbind(prd, defaults.perf), 1, min)
-  }
-  # Predict newdata, compute prediction
-  f = function(x, surrogates, defaults.perf, q) {
-    prds = sapply(surrogates$surrogates, function(surr) {
-      prd = predict(surr, newdata = x)$data$response
-      parmin = sapply(prd, fn, defaults.perf = defaults.perf)
-      quantile(parmin, q = q)
-    })
-  }
-  ctrl = makeFocusSearchControl(maxit = 5, restarts = 5, points = 100)
-  z = focussearch(f, surrogates$param.set, ctrl, surrogates = surrogates, defaults.perf = defaults.perf, q = q)
+# @param probs Quantile we want to optimize
+doFocusSearch = function (surrogates, defaults.perf = NULL, probs = 0.5) {
+  
+  ctrl = makeFocusSearchControl(maxit = 5, restarts = 5, points = 10)
+  z = focussearch(pfun, surrogates$param.set, ctrl, show.info = TRUE, defaults.perf = defaults.perf)
   z$dsperfs = sapply(surrogates$surrogates, function(m) {predict(m, newdata = z$x)$data$response})
   return(z)
 }
 
-# doFocusSearch(surrogates)
-#
-LOOCV = function(i, surrogates) {
-  surr = surrogates$surrogates[-i]
+# # Do a single Leave-One-Out CV Iteration
+# @param i Surrogate id to drop in this iteration
+# @param surrogates List of surrogates
+# @param n.defaults How many defaults to learn
+loocvIter = function(i, surrogates, n.defaults, probs = 0.5) {
+  hout.surr = surrogates$surrogates[[i]]
+  # Drop the i-th surrogate
+  pfun = makeObjFunction(surrogates$surrogates[-i], probs = 0.5)
+  defaults.perf = NULL
+  defaults = NULL
+  for (j in seq_len(n.defaults)) {
+    # Search for optimal points given previous defaults
+    z = doFocusSearch(pfun, defaults.perf = defaults.perf)
+    catf("New best y: %f found for x: %s \n", z$y, paste0(z$x, collapse = ","))
+    # Add optimal point to defaults
+    defaults.perf = cbind(defaults.perf, z$dsperfs)
+    defaults = cbind(defaults, z$x)
+  }
   # FIXME: How do we do the evaluation?
   # Option a: On surrogate
   # Option b: On real task
+  predict(hout.surr, newdata = z$x)$data$response
 }
 
 # Calculate default hyperparameter setting

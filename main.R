@@ -1,17 +1,15 @@
 library(devtools)
 library(stringi)
-# install_github("berndbischl/focussearch")
 library(focussearch)
 load_all()
 
-# ----
 # Get file from the figshare repository
 load(url("https://ndownloader.figshare.com/files/10462297"))
 data.ids = sort(unique(tbl.results$data_id))
 
+# Learner parsets and names
 lrn.par.set = getMultipleLearners()
 learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.set)), 1, -5)
-
 # Possible measures
 measures = list(auc, acc, brier)
 # Possible scalings
