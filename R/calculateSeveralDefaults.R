@@ -31,12 +31,16 @@ defaultForward = function(surrogates, par.set, n.defaults = 10, probs = 0.5) {
 defaultLOOCV = function(surrogates, n.defaults = 10, probs = 0.5) {  
   # Do LOOCV
   inds = seq_len(length(surrogates$surrogates))
-  lst = lapply(inds, loocvIter, surrogates, n.defaults, probs)
+  parallelMap::parallelStartMulticore(4)
+  lst = parallelMap::parallelLapply(inds, loocvIter, surrogates, n.defaults, probs)
+  paralellMap::parallelStop()
+  perfs = extractSubList(lst, "y")
   # cummulative min (we choose the best default from a set of n defaults)
-  y.cummin = apply(extractSubList(lst, "y"), 2, cummin)
+  y.cummin = apply(perfs, 2, cummin)
   # Compute mean over resample iters
   y.mean = setNames(apply(y.cummin, 1, mean), paste0("def", seq_len(n.defaults)))
-  return(y.mean)
+  catf("End LOOCV iter, y.mean: %f", paste0(y.mean, collapse = " "))
+  return(list("y.mean" = y.mean, "params" = extractSubList(lst, "x"), "full.y" = perfs))
 }
 
 # # Do a single Leave-One-Out CV Iteration
@@ -83,7 +87,10 @@ makeObjFunction = function(surrogates, probs) {
 # @param param.set Parameter set
 # @param defaults.perf = performances of defaults 1, ..., n-1.
 focusSearchDefaults = function (pfun, surrogates, param.set, defaults.perf) {
-  ctrl = makeFocusSearchControl(maxit = 4, restarts = 5, points = 100)
+  points = 10^5
+  # For knn do not search the full param space
+  if (getParamIds(param.set)[1] == "k") points = 30
+  ctrl = makeFocusSearchControl(maxit = 4, restarts = 10, points = points)
   z = focussearch(pfun, param.set, ctrl, show.info = FALSE, defaults.perf = defaults.perf)
   z$dsperfs = sapply(surrogates, function(m) {predict(m, newdata = z$x)$data$response})
   return(z)

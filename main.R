@@ -35,12 +35,8 @@ for(i in seq_along(learner.names)) {
 
 
 # Forward selection
-defaults = list()
+defaults = setNames(as.list(numeric(length(learner.names))), stri_sub(learner.names, 13, 100))
 files = list.files("surrogates")
-i = 2
-surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
-surrogates$surrogates = surrogates$surrogates[1:10]
-defaultLOOCV(surrogates, n.defaults = 2, probs = 0.5)
 
 for(i in seq_along(learner.names)) {
   catf("Learner: %s", learner.names[i])
@@ -48,9 +44,11 @@ for(i in seq_along(learner.names)) {
   # Read surrogates from Hard Drive
   surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
   # Default calculation
-  defaults[[i]] = defaultLOOCV(surrogates, n.defaults = 2, probs = 0.5)
+  defaults[[i]] = defaultLOOCV(surrogates, n.defaults = 20, probs = 0.5)
+  saveRDS(defaults, stri_paste("defaultLOOCV/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
+  gc()
 }
-names(defaults) = stri_sub(learner.names, 13, 100)
+
 
 for(i in seq_along(learner.names)) {
   for(j in 1:ncol(defaults[[i]]$default)) {
