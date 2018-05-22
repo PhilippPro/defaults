@@ -30,14 +30,17 @@ defaultForward = function(surrogates, par.set, n.defaults = 10, probs = 0.5) {
 # @param probs Quantile to optimize
 # @param houtsets Number of datasets to hold out
 defaultCV = function(surrogates, n.defaults = 10, probs = 0.5, houtsets = 5) {  
-  # Do LOOCV
+  # Create CV Splits
   inds = seq_len(length(surrogates$surrogates))
   inds = split(inds, ceiling(seq_along(inds) / houtsets))
-  parallelMap::parallelStartMulticore(4)
+  
+  # Parallelize CV
+  parallelMap::parallelStartMulticore(8)
   lst = parallelMap::parallelLapply(inds, cvIter, surrogates, n.defaults, probs)
-  paralellMap::parallelStop()
-  browser()
-  perfs = extractSubList(lst, "y")
+  parallelMap::parallelStop()
+  
+  # Extract relevant results (mean over OOB datasets)
+  perfs = sapply(extractSubList(lst, "y"), function(x) {apply(x, 1, mean)})
   # cummulative min (we choose the best default from a set of n defaults)
   y.cummin = apply(perfs, 2, cummin)
   # Compute mean over resample iters
@@ -93,9 +96,10 @@ makeObjFunction = function(surrogates, probs) {
 # @param defaults.perf = performances of defaults 1, ..., n-1.
 focusSearchDefaults = function (pfun, surrogates, param.set, defaults.perf) {
   points = 10^4
-  # For knn do not search the full param space
+  # For knn do not search the full param space FIXME: Make this nicer
   if (getParamIds(param.set)[1] == "k") points = 30
-  ctrl = makeFocusSearchControl(maxit = 4, restarts = 4, points = points)
+  # Do the focussearch
+  ctrl = makeFocusSearchControl(maxit = 6, restarts = 4, points = points)
   z = focussearch(pfun, param.set, ctrl, show.info = FALSE, defaults.perf = defaults.perf)
   z$dsperfs = sapply(surrogates, function(m) {predict(m, newdata = z$x)$data$response})
   return(z)

@@ -3,9 +3,9 @@ library(stringi)
 library(focussearch)
 load_all()
 
-# Get file from the figshare repository
-load(url("https://ndownloader.figshare.com/files/10462297"))
-data.ids = sort(unique(tbl.results$data_id))
+# # Get file from the figshare repository
+# load(url("https://ndownloader.figshare.com/files/10462297"))
+# data.ids = sort(unique(tbl.results$data_id))
 
 # Learner parsets and names
 lrn.par.set = getMultipleLearners()
@@ -43,7 +43,7 @@ for(i in seq_along(learner.names)) {
   # Read surrogates from Hard Drive
   surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
   # Default calculation
-  defaults[[i]] = defaultCV(surrogates, n.defaults = 20, probs = 0.5)
+  defaults[[i]] = defaultCV(surrogates, n.defaults = 10, probs = 0.5)
   saveRDS(defaults, stri_paste("defaultLOOCV/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
   gc()
 }
