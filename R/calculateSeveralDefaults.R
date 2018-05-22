@@ -28,12 +28,15 @@ defaultForward = function(surrogates, par.set, n.defaults = 10, probs = 0.5) {
 # @param surrogates Surrogate models
 # @param n.defauls How many defaults
 # @param probs Quantile to optimize
-defaultLOOCV = function(surrogates, n.defaults = 10, probs = 0.5) {  
+# @param houtsets Number of datasets to hold out
+defaultCV = function(surrogates, n.defaults = 10, probs = 0.5, houtsets = 5) {  
   # Do LOOCV
   inds = seq_len(length(surrogates$surrogates))
+  inds = split(inds, ceiling(seq_along(inds) / houtsets))
   parallelMap::parallelStartMulticore(4)
-  lst = parallelMap::parallelLapply(inds, loocvIter, surrogates, n.defaults, probs)
+  lst = parallelMap::parallelLapply(inds, cvIter, surrogates, n.defaults, probs)
   paralellMap::parallelStop()
+  browser()
   perfs = extractSubList(lst, "y")
   # cummulative min (we choose the best default from a set of n defaults)
   y.cummin = apply(perfs, 2, cummin)
@@ -48,13 +51,15 @@ defaultLOOCV = function(surrogates, n.defaults = 10, probs = 0.5) {
 # @param surrogates List of surrogates
 # @param n.defaults How many defaults to learn
 # @param probs Quantile we want to optimize
-loocvIter = function(i, surrogates, n.defaults, probs) {
+cvIter = function(i, surrogates, n.defaults, probs) {
   catf("LOOCV iter: %i", i)
   # Do the forward search
   defaults.params = defaultForward(surrogates$surrogates[-i], surrogates$param.set, n.defaults, probs)
   # FIXME: How do we do the evaluation?
   # Now: On surrogate / Option b: On real task
-  prd.hout = predict(surrogates$surrogates[[i]], newdata = defaults.params)$data$response
+  prd.hout = sapply(surrogates$surrogates[i], function(x) {
+    predict(x, newdata = defaults.params)$data$response
+  })
   return(list("y" = prd.hout, "x" = defaults.params))
 }
 
@@ -87,10 +92,10 @@ makeObjFunction = function(surrogates, probs) {
 # @param param.set Parameter set
 # @param defaults.perf = performances of defaults 1, ..., n-1.
 focusSearchDefaults = function (pfun, surrogates, param.set, defaults.perf) {
-  points = 10^5
+  points = 10^4
   # For knn do not search the full param space
   if (getParamIds(param.set)[1] == "k") points = 30
-  ctrl = makeFocusSearchControl(maxit = 4, restarts = 10, points = points)
+  ctrl = makeFocusSearchControl(maxit = 4, restarts = 4, points = points)
   z = focussearch(pfun, param.set, ctrl, show.info = FALSE, defaults.perf = defaults.perf)
   z$dsperfs = sapply(surrogates, function(m) {predict(m, newdata = z$x)$data$response})
   return(z)

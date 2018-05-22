@@ -15,36 +15,35 @@ measures = list(auc, acc, brier)
 # Possible scalings
 scaling = c("none", "logit", "zscale", "scale01")
 
-surrogate.mlr.lrn = makeLearner("regr.ranger",
-  # We use the defautls from Philips paper.
-  par.vals = list(num.trees = 2000, respect.unordered.factors = "order", num.threads = 32,
-                  replace = FALSE, sample.fraction = 0.751))
-
-k = 1 # auc
-scaling = "none"
-for(i in seq_along(learner.names)) {
-  sprintf("Learner %i: %s", i, learner.names[i])
-  set.seed(199 + i)
-  # Surrogate model calculation
-  surrogates = makeSurrogateModels(measure = measures[[k]], learner.name = learner.names[i], 
-    data.ids = data.ids, tbl.results, tbl.metaFeatures, tbl.hypPars, lrn.par.set, surrogate.mlr.lrn,
-    scale_before = TRUE, scaling = scaling)
-  saveRDS(surrogates, file = paste0("surrogates/", stri_sub(learner.names[i], from = 5), measures[k]$id, "_scale_", scaling, ".RDS"))
-  gc()
-}
+# Learn the surrogate models
+# surrogate.mlr.lrn = makeLearner("regr.ranger",
+#   # We use the defautls from Philips paper.
+#   par.vals = list(num.trees = 2000, respect.unordered.factors = "order", num.threads = 32,
+#                   replace = FALSE, sample.fraction = 0.751))
+# k = 1 # auc
+# scaling = "none"
+# for(i in seq_along(learner.names)) {
+#   sprintf("Learner %i: %s", i, learner.names[i])
+#   set.seed(199 + i)
+#   # Surrogate model calculation
+#   surrogates = makeSurrogateModels(measure = measures[[k]], learner.name = learner.names[i], 
+#     data.ids = data.ids, tbl.results, tbl.metaFeatures, tbl.hypPars, lrn.par.set, surrogate.mlr.lrn,
+#     scale_before = TRUE, scaling = scaling)
+#   saveRDS(surrogates, file = paste0("surrogates/", stri_sub(learner.names[i], from = 5), measures[k]$id, "_scale_", scaling, ".RDS"))
+#   gc()
+# }
 
 
 # Forward selection
 defaults = setNames(as.list(numeric(length(learner.names))), stri_sub(learner.names, 13, 100))
 files = list.files("surrogates")
-
 for(i in seq_along(learner.names)) {
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
   # Read surrogates from Hard Drive
   surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
   # Default calculation
-  defaults[[i]] = defaultLOOCV(surrogates, n.defaults = 20, probs = 0.5)
+  defaults[[i]] = defaultCV(surrogates, n.defaults = 20, probs = 0.5)
   saveRDS(defaults, stri_paste("defaultLOOCV/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
   gc()
 }
