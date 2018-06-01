@@ -17,7 +17,7 @@ scaling = c("none", "logit", "zscale", "scale01")
 
 # Learn the surrogate models
 # surrogate.mlr.lrn = makeLearner("regr.ranger",
-#   # We use the defautls from Philips paper.
+#   # We use the defaults from Philipps paper.
 #   par.vals = list(num.trees = 2000, respect.unordered.factors = "order", num.threads = 32,
 #                   replace = FALSE, sample.fraction = 0.751))
 # k = 1 # auc
