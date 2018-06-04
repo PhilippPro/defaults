@@ -1,4 +1,3 @@
-
 getSimpleLearners = function(){
   # Simple learner param set
   simple.lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.glmnet", predict.type = "prob"),
@@ -17,7 +16,7 @@ getSimpleLearners = function(){
   return(simple.lrn.par.set)
 }
 
-getMultipleLearners = function(){
+getLearnerParSets = function(){
   simple.lrn.par.set = getSimpleLearners()
   
   # increase to a general param set
@@ -112,4 +111,20 @@ convertParamType = function(x, param_type) {
   if(param_type %in% c("character", "logical", "factor", "discrete"))
     x = as.factor(x)
   return(x)
+}
+
+# # Create Train/Test Splits: 
+# set.seed(199)
+# train = sample(names(surrogates$surrogates), 19)
+# test = setdiff(names(surrogates$surrogates), train)
+
+# Create Train/Test Splits:
+train_split = function() {
+  c("31", "1467", "1471", "335", "3", "334", "1462", "1176", "1494","1036", "1487", "1046", "1068", 
+    "44", "1570", "1050", "1486", "37", "1480")
+}
+
+test_split = function() {
+  c("50", "151", "312", "333", "1038", "1043", "1049", "1063", "1067", "1120", "1461", "1464",
+    "1479", "1485", "1489", "1504", "1510", "4134", "4534")
 }

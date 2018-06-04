@@ -1,78 +1,125 @@
 library(devtools)
 library(stringi)
 library(focussearch)
+library(doParallel)
+library(foreach)
 load_all()
 
-# # Get file from the figshare repository
+# ----------------------------------------------------------------------------------
+# Get randomBot Data from the figshare repository
 # load(url("https://ndownloader.figshare.com/files/10462297"))
-# data.ids = sort(unique(tbl.results$data_id))
-
-# Learner parsets and names
-lrn.par.set = getMultipleLearners()
-learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.set)), 1, -5)
-# Possible measures
-measures = list(auc, acc, brier)
-# Possible scalings
-scaling = c("none", "logit", "zscale", "scale01")
-
-# Learn the surrogate models
-# surrogate.mlr.lrn = makeLearner("regr.ranger",
-#   # We use the defautls from Philips paper.
-#   par.vals = list(num.trees = 2000, respect.unordered.factors = "order", num.threads = 32,
-#                   replace = FALSE, sample.fraction = 0.751))
-# k = 1 # auc
-# scaling = "none"
-# for(i in seq_along(learner.names)) {
-#   sprintf("Learner %i: %s", i, learner.names[i])
-#   set.seed(199 + i)
-#   # Surrogate model calculation
-#   surrogates = makeSurrogateModels(measure = measures[[k]], learner.name = learner.names[i], 
-#     data.ids = data.ids, tbl.results, tbl.metaFeatures, tbl.hypPars, lrn.par.set, surrogate.mlr.lrn,
-#     scale_before = TRUE, scaling = scaling)
-#   saveRDS(surrogates, file = paste0("surrogates/", stri_sub(learner.names[i], from = 5), measures[k]$id, "_scale_", scaling, ".RDS"))
-#   gc()
-# }
 
 
+# ----------------------------------------------------------------------------------
+# Train/Save the surrogates
+lrn.par.sets = getLearnerParSets()
+learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
+
+# Use cubist as a learner
+surrogate.mlr.lrn = makeLearner("regr.cubist")
+# registerDoParallel(8)
+# train_save_surrogates(surrogate.mlr.lrn, lrn.par.sets[4], learner.names[4])
+# stopImplicitCluster()
+
+# Extract a grid from the surrogates
+# parallelMap::parallelStartMulticore(parallel::detectCores())
+# predictGridFromSurrogates(readRDS("surrogates/regr.cubistclassif.svmauczscale.RDS"), learner.names[4]) 
+# parallelMap::parallelStop()
+
+# ----------------------------------------------------------------------------------
 # Forward selection
 defaults = setNames(as.list(numeric(length(learner.names))), stri_sub(learner.names, 13, 100))
-files = list.files("surrogates")
+files = list.files("surrogates")[grep(x = list.files("surrogates"), surrogate.mlr.lrn$id)]
+
 for(i in seq_along(learner.names)) {
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
+  
   # Read surrogates from Hard Drive
   surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
-  # Default calculation
-  defaults[[i]] = defaultCV(surrogates, n.defaults = 10, probs = 0.5)
-  saveRDS(defaults, stri_paste("defaultLOOCV/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
+  
+  # Search for defaults
+  train = searchDefaults(surrogates$surrogates, surrogates$param.set, n.defaults = 10, probs = 0.5)
+  
+  # Get performance on train and test data
+  prds = getDefaultPerfs(surrogates$surrogates, lst$params)
+
+  saveRDS(list("preds" = prds, "params" = train),
+          stri_paste("defaultLOOCV/p1", gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
   gc()
 }
 
+# ----------------------------------------------------------------------------------
+# Create Plots comparing to random search
+# Read in found defaults and surrogates
+lst = readRDS("defaultLOOCV/p1cubistclassif.svmauczscale.RDS")
+surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
 
-for(i in seq_along(learner.names)) {
-  for(j in 1:ncol(defaults[[i]]$default)) {
-    if(is.factor(defaults[[i]]$default[,j]))
-      defaults[[i]]$default[,j] = as.character(defaults[[i]]$default[,j])
-    defaults[[i]]$default[,j][defaults[[i]]$default[,j] == -11] = NA 
+
+
+# Do the randomsearch for different multipliers
+set.seed(199 + i)
+ys = foreach(points = seq(from = 2, to = 10, by = 2), .combine = "rbind") %:%
+  foreach(multiplier = c(1, 2, 4, 8), .combine = "rbind") %do% {
+    rs = randomSearch(surrogates$surrogates, surrogates$param.set, multiplier, points)
+    extractSubList(rs, "y")
   }
+df = data.frame(ys, row.names = NULL) %>%
+  mutate(points = rep(seq(from = 2, to = 10, by = 2), each = 4),
+         multiplier = rep(paste0("x", c(1, 2, 4, 8)), times = 5))
+colnames(df) = gsub("X", "", colnames(df))
+
+# Plot function
+create_plot = function(n.defaults) {
+  def = gather(prds, "dataset", "y") %>%
+    group_by(dataset) %>%
+    filter(row_number() <= n.defaults) %>%
+    summarise(y = min(y))
+  rnd = df %>% filter(points == n.defaults) %>%
+    gather("dataset", "y", -one_of(c("points", "multiplier"))) %>%
+    select(-points) %>% spread("multiplier", "y")
+  p = inner_join(def, rnd, by = "dataset") %>%
+    mutate("x1" = y - x1, "x2" = y - x2, "x4" =  y - x4, "x8" = y - x8) %>%
+    mutate(split = ifelse(dataset %in% train_split(), "train", "test")) %>%
+    mutate(split = factor(split, levels = c("train", "test"))) %>%
+    select(-y) %>%
+    gather("randomsearch", "delta_y", -one_of("dataset", "split")) %>%
+    mutate(randomsearch = factor(randomsearch, levels = c("x1", "x2", "x4", "x8"))) %>%
+    ggplot(aes(x = randomsearch, y = delta_y)) +
+    geom_boxplot() + facet_wrap(~split) + 
+    ggtitle(paste0("Using ", n.defaults, " defaults"))
+  ggsave(p, filename = paste0("defaultLOOCV/d", n.defaults, "svm_feather.png"))
+return(p)
 }
 
-defaults$ranger$default$replace = as.logical(defaults$ranger$default$replace)
-levels(defaults$ranger$default$respect.unordered.factors) = c("ignore", "order")
-defaults$ranger$default$respect.unordered.factors = as.character(defaults$ranger$default$respect.unordered.factors)
-
-save(defaults, file = "defaults.RData")
-
-load("defaults.RData")
+# Plot and save the plots
+sapply(seq(from = 2, to = 10, by = 2), create_plot)
 
 
 
-# Performance of first default
-for(i in 1:6)
-  print(c(stri_sub(learner.names[i], 13, 30), round(mean(defaults[[i]]$result[1,]), 4)))
 
-# Performance of first 10 defaults
-for(i in 1:6)
-  print(c(stri_sub(learner.names[i], 13, 30), round(mean(apply(defaults[[i]]$result, 2, max)), 4)))
+
+
+
+# for(i in seq_along(learner.names)) {
+#   for(j in 1:ncol(defaults[[i]]$default)) {
+#     if(is.factor(defaults[[i]]$default[,j]))
+#       defaults[[i]]$default[,j] = as.character(defaults[[i]]$default[,j])
+#     defaults[[i]]$default[,j][defaults[[i]]$default[,j] == -11] = NA 
+#   }
+# }
+# defaults$ranger$default$replace = as.logical(defaults$ranger$default$replace)
+# levels(defaults$ranger$default$respect.unordered.factors) = c("ignore", "order")
+# defaults$ranger$default$respect.unordered.factors = as.character(defaults$ranger$default$respect.unordered.factors)
+# 
+# save(defaults, file = "defaults.RData")
+# 
+# load("defaults.RData")
+# # Performance of first default
+# for(i in 1:6)
+#   print(c(stri_sub(learner.names[i], 13, 30), round(mean(defaults[[i]]$result[1,]), 4)))
+# # Performance of first 10 defaults
+# for(i in 1:6)
+#   print(c(stri_sub(learner.names[i], 13, 30), round(mean(apply(defaults[[i]]$result, 2, max)), 4)))
 
 

@@ -1,3 +1,68 @@
+#' Train and save surrogate models on all datasets
+#' @param surrogate.mlr.lrn Surrogate learner
+#' @param measure Name of the measure to optimize.
+#'   Can be one of: measures = list(auc, acc, brier)
+#' @param scaling Scaling to use. 
+#'   Can be one of: scaling = c("none", "logit", "zscale", "scale01")
+train_save_surrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, measure = auc, scaling = "zscale") {
+  data.ids = sort(unique(tbl.results$data_id))
+  
+  foreach(i = seq_along(learner.names)) %:% {
+    sprintf("Learner %i: %s", i, learner.names[i])
+    set.seed(199 + i)
+    # Surrogate model calculation
+    surrogates = makeSurrogateModels(measure = measure, learner.name = learner.names[i],
+                                     data.ids = data.ids, tbl.results, tbl.metaFeatures, tbl.hypPars,
+                                     lrn.par.set, surrogate.mlr.lrn,
+                                     scale_before = TRUE, scaling = scaling)
+    # Save surrogates
+    saveRDS(surrogates, file = paste("surrogates/", surrogate.mlr.lrn$id,
+                                      stri_sub(learner.names[i], from = 5),
+                                      measure$id, scaling, ".RDS", sep = "_"))
+  }
+  messagef("Successfully computed all surrogates")
+  return(surrogates)
+}
+
+#' Resample surrogate models on all datasets
+#' @param surrogate.mlr.lrn Surrogate learner
+#' @param measure Name of the measure to optimize.
+#'   Can be one of: measures = list(auc, acc, brier)
+#' @param scaling Scaling to use. 
+#'   Can be one of: scaling = c("none", "logit", "zscale", "scale01")
+resample_surrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, measure = auc, scaling = "zscale") {
+  
+  data.ids = sort(unique(tbl.results$data_id))
+  param.set = lrn.par.set[[which(names(lrn.par.set) == paste0(substr(learner.name, 5, 100), ".set"))]]$param.set
+  
+  #train mlr model on full table for measure
+  task.data = makeBotTable(measure, learner.name, tbl.results, tbl.metaFeatures, tbl.hypPars, param.set, data.ids, scale_before, scaling)
+  task.data = data.frame(task.data)
+  task.data = deleteNA(task.data)
+
+  # get specific task ids
+  if(!is.null(data.ids)) {
+    uni = unique(task.data$data_id)
+    data.ids = sort(uni[uni %in% data.ids])
+  } else {
+    data.ids = sort(unique(task.data$data_id))
+  }
+  
+  mlr.mod.measure = foreach(i = seq_along(data.ids)) %dopar% {
+    gc()
+    print(paste("surrogate train: task", i, "of", length(data.ids)))
+    data.idi = data.ids[i]
+    
+    mlr.task.measure = makeRegrTask(id = as.character(data.idi),
+                                    subset(task.data, data_id == data.idi,
+                                           select =  c("measure.value", names(param.set$pars))), target = "measure.value")
+    resample(surrogate.mlr.lrn, mlr.task.measure, resampling = cv3)
+  }
+  names(mlr.mod.measure) = data.ids
+  
+  return(mlr.mod.measure)
+}
+
 #' Create surrogate models for different tasks
 #' @param measure Name of the measure to optimize
 #' @param learner.name Name of learner
@@ -9,9 +74,9 @@
 #' @param min.experiments minimum number of experiments that should be available for a dataset, otherwise the dataset is excluded
 #' @return surrogate model
 makeSurrogateModels = function(measure, learner.name, data.ids, tbl.results, 
-  tbl.metaFeatures, tbl.hypPars, lrn.par.set, surrogate.mlr.lrn, scale_before = TRUE, scaling = "none") {
+                               tbl.metaFeatures, tbl.hypPars, lrn.par.set, surrogate.mlr.lrn, scale_before = TRUE, scaling = "none") {
   
-
+  
   param.set = lrn.par.set[[which(names(lrn.par.set) == paste0(substr(learner.name, 5, 100), ".set"))]]$param.set
   
   #train mlr model on full table for measure
@@ -27,17 +92,17 @@ makeSurrogateModels = function(measure, learner.name, data.ids, tbl.results,
     data.ids = sort(unique(task.data$data_id))
   }
   
-  mlr.mod.measure = list()
-  for(i in seq_along(data.ids)) {
+  mlr.mod.measure = foreach(i = seq_along(data.ids)) %dopar% {
+    gc()
     print(paste("surrogate train: task", i, "of", length(data.ids)))
     data.idi = data.ids[i]
     
-    mlr.task.measure = makeRegrTask(id = as.character(data.idi), subset(task.data, data_id == data.idi,
-      select =  c("measure.value", names(param.set$pars))), target = "measure.value")
-    mlr.lrn = surrogate.mlr.lrn
-    mlr.mod.measure[[i]] = train(mlr.lrn, mlr.task.measure)
-    gc()
+    mlr.task.measure = makeRegrTask(id = as.character(data.idi),
+                                    subset(task.data, data_id == data.idi,
+                                           select =  c("measure.value", names(param.set$pars))), target = "measure.value")
+    train(surrogate.mlr.lrn, mlr.task.measure)
   }
+  names(mlr.mod.measure) = data.ids
   return(list(surrogates = mlr.mod.measure, param.set = param.set))
 }
 
@@ -83,7 +148,7 @@ makeBotTable = function(measure, learner.name, tbl.results, tbl.metaFeatures, tb
     bot.table$min.node.size = log(bot.table$min.node.size, 2) / log(bot.table$value, 2)
     bot.table = bot.table %>% select(., -value)
   }
-
+  
   bot.table = bot.table %>% select(., -task_id)
   colnames(bot.table)[colnames(bot.table) == measure$id] = "measure.value"
   bot.table$measure.value = as.numeric(bot.table$measure.value)

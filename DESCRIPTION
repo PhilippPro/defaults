@@ -17,4 +17,5 @@ Depends:
   checkmate (>= 1.8.0),
   tidyr (>= 0.6.1),
   stringi (>= 1.1.2),
-  focussearch
+  focussearch,
+  ggplot2
