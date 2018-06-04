@@ -9,7 +9,6 @@ load_all()
 # Get randomBot Data from the figshare repository
 # load(url("https://ndownloader.figshare.com/files/10462297"))
 
-
 # ----------------------------------------------------------------------------------
 # Train/Save the surrogates
 lrn.par.sets = getLearnerParSets()
