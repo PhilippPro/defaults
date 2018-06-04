@@ -18,7 +18,7 @@ train_save_surrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, 
     # Save surrogates
     saveRDS(surrogates, file = paste("surrogates/", surrogate.mlr.lrn$id,
                                       stri_sub(learner.names[i], from = 5),
-                                      measure$id, scaling, ".RDS", sep = "_"))
+                                      measure$id, scaling, ".RDS", sep = "_", collapse = "_"))
   }
   messagef("Successfully computed all surrogates")
   return(surrogates)

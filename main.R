@@ -16,21 +16,24 @@ learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
 
 # Use cubist as a learner
 surrogate.mlr.lrn = makeLearner("regr.cubist")
-# registerDoParallel(8)
-# train_save_surrogates(surrogate.mlr.lrn, lrn.par.sets[4], learner.names[4])
-# stopImplicitCluster()
+# foreach(i = 4) %do% { # seq_along(learner.names)
+#   registerDoParallel(8)
+#   train_save_surrogates(surrogate.mlr.lrn, lrn.par.sets[i], learner.names[i])
+#   stopImplicitCluster()
+# }
 
 # Extract a grid from the surrogates
-# parallelMap::parallelStartMulticore(parallel::detectCores())
-# predictGridFromSurrogates(readRDS("surrogates/regr.cubistclassif.svmauczscale.RDS"), learner.names[4]) 
-# parallelMap::parallelStop()
-
+# foreach(i = 4) %do% { # seq_along(learner.names)
+#   parallelMap::parallelStartMulticore(parallel::detectCores())
+#   predictGridFromSurrogates(readRDS("surrogates/regr.cubistclassif.svmauczscale.RDS"), learner.names[i]) 
+#   parallelMap::parallelStop()
+# }
 # ----------------------------------------------------------------------------------
 # Forward selection
 defaults = setNames(as.list(numeric(length(learner.names))), stri_sub(learner.names, 13, 100))
 files = list.files("surrogates")[grep(x = list.files("surrogates"), surrogate.mlr.lrn$id)]
 
-for(i in seq_along(learner.names)) {
+for(i in 4) { # seq_along(learner.names)
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
   
@@ -44,7 +47,8 @@ for(i in seq_along(learner.names)) {
   prds = getDefaultPerfs(surrogates$surrogates, lst$params)
 
   saveRDS(list("preds" = prds, "params" = train),
-          stri_paste("defaultLOOCV/p1", gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
+          stri_paste("defaultLOOCV/p1",
+            gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
   gc()
 }
 
