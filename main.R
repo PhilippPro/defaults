@@ -9,7 +9,7 @@ load_all()
 # load(url("https://ndownloader.figshare.com/files/10462297"))
 
 
-# Train/Save the surrogatesnm ------------------------------------------------------
+# Train/Save the surrogates ------------------------------------------------------
 
 lrn.par.sets = getLearnerParSets()
 learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
@@ -34,10 +34,10 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
 
 
 
+
 # Forward selection ----------------------------------------------------------------------------------
 defaults = setNames(as.list(numeric(length(learner.names))), stri_sub(learner.names, 13, 100))
 files = list.files("surrogates")[grep(x = list.files("surrogates"), surrogate.mlr.lrn$id)]
-
 for(i in 4) { # seq_along(learner.names)
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
@@ -58,13 +58,14 @@ for(i in 4) { # seq_along(learner.names)
 }
 
 
+
 # Create Plots comparing to random search ------------------------------------------------------------
 # Read in found defaults and surrogates
 lst = readRDS("defaultLOOCV/Q2_cubist_classif.svm_auc_zscale_.RDS")
 surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
 
-# Do the randomsearch for different multipliers
-set.seed(199 + i)
+# Get data from randomsearch:
+set.seed(199)
 ys = foreach(points = seq(from = 2, to = 10, by = 2), .combine = "rbind") %:%
   foreach(multiplier = c(1, 2, 4, 8), .combine = "rbind") %do% {
     rs = randomSearch(surrogates$surrogates, surrogates$param.set, multiplier, points)
@@ -96,20 +97,19 @@ create_plot = function(n.defaults) {
     geom_boxplot() + facet_wrap(~split) + 
     ggtitle(paste0("Using ", n.defaults, " defaults"))
   ggsave(p, filename = paste0("defaultLOOCV/d", n.defaults, "svm", "Q2", ".png"))
-return(p)
+  return(NULL)
 }
-
 # Plot and save the plots
 sapply(seq(from = 2, to = 10, by = 2), create_plot)
 
-# Eval on true test set
-registerDoParallel(cores = 20)
-evalDefaultsOpenML(test_split()[1:2], makeLearner("classif.svm"), lst$params)
+
+
+# Eval on true test set ------------------------------------------------------------
+registerDoParallel(cores = 32)
+evalDefaultsOpenML(test_split("task.ids"), makeLearner("classif.svm"), lst$params)
 stopImplicitCluster()
 
-
-
-
+# Old Unused Code -----------------------------------------------------------------
 # for(i in seq_along(learner.names)) {
 #   for(j in 1:ncol(defaults[[i]]$default)) {
 #     if(is.factor(defaults[[i]]$default[,j]))

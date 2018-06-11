@@ -3,6 +3,7 @@
 # @param lrn Learner
 # @param pars Single param Configuration
 evalParsOpenML = function(task, lrn, pars) {
+  
   # Convert factor params to character
   pars = lapply(pars, function(x) {if (is.factor(x)) x = as.character(x); x})
   # Filter invalid params
