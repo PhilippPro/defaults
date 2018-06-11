@@ -5,19 +5,22 @@ library(doParallel)
 library(foreach)
 load_all()
 
-# ----------------------------------------------------------------------------------
-# Get randomBot Data from the figshare repository
+# Get randomBot Data from the figshare repository-------------------------
 # load(url("https://ndownloader.figshare.com/files/10462297"))
 
-# ----------------------------------------------------------------------------------
-# Train/Save the surrogates
+
+# Train/Save the surrogatesnm ------------------------------------------------------
+
 lrn.par.sets = getLearnerParSets()
 learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
 
 # Use cubist as a learner
-surrogate.mlr.lrn = makeLearner("regr.cubist")
+# 20 Comittees in order to get a lower mse (25% better then 1 comittee) 
+# and set extrapolation to 20 in order to not extrapolate to no-data areas to much.
+surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 20)
+
 # foreach(i = 4) %do% { # seq_along(learner.names)
-#   registerDoParallel(8)
+#   registerDoParallel(19)
 #   train_save_surrogates(surrogate.mlr.lrn, lrn.par.sets[i], learner.names[i])
 #   stopImplicitCluster()
 # }
@@ -28,8 +31,10 @@ surrogate.mlr.lrn = makeLearner("regr.cubist")
 #   predictGridFromSurrogates(readRDS("surrogates/regr.cubistclassif.svmauczscale.RDS"), learner.names[i]) 
 #   parallelMap::parallelStop()
 # }
-# ----------------------------------------------------------------------------------
-# Forward selection
+
+
+
+# Forward selection ----------------------------------------------------------------------------------
 defaults = setNames(as.list(numeric(length(learner.names))), stri_sub(learner.names, 13, 100))
 files = list.files("surrogates")[grep(x = list.files("surrogates"), surrogate.mlr.lrn$id)]
 
@@ -44,21 +49,19 @@ for(i in 4) { # seq_along(learner.names)
   train = searchDefaults(surrogates$surrogates, surrogates$param.set, n.defaults = 10, probs = 0.5)
   
   # Get performance on train and test data
-  prds = getDefaultPerfs(surrogates$surrogates, lst$params)
+  prds = getDefaultPerfs(surrogates$surrogates, train)
 
   saveRDS(list("preds" = prds, "params" = train),
-          stri_paste("defaultLOOCV/p1",
+          stri_paste("defaultLOOCV/Q2",
             gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
   gc()
 }
 
-# ----------------------------------------------------------------------------------
-# Create Plots comparing to random search
+
+# Create Plots comparing to random search ------------------------------------------------------------
 # Read in found defaults and surrogates
-lst = readRDS("defaultLOOCV/p1cubistclassif.svmauczscale.RDS")
+lst = readRDS("defaultLOOCV/Q2_cubist_classif.svm_auc_zscale_.RDS")
 surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
-
-
 
 # Do the randomsearch for different multipliers
 set.seed(199 + i)
@@ -74,7 +77,8 @@ colnames(df) = gsub("X", "", colnames(df))
 
 # Plot function
 create_plot = function(n.defaults) {
-  def = gather(prds, "dataset", "y") %>%
+  def = gather(lst$preds, "dataset", "y") %>%
+    separate(dataset, into = c("dataset", "split")) %>%
     group_by(dataset) %>%
     filter(row_number() <= n.defaults) %>%
     summarise(y = min(y))
@@ -91,15 +95,17 @@ create_plot = function(n.defaults) {
     ggplot(aes(x = randomsearch, y = delta_y)) +
     geom_boxplot() + facet_wrap(~split) + 
     ggtitle(paste0("Using ", n.defaults, " defaults"))
-  ggsave(p, filename = paste0("defaultLOOCV/d", n.defaults, "svm_feather.png"))
+  ggsave(p, filename = paste0("defaultLOOCV/d", n.defaults, "svm", "Q2", ".png"))
 return(p)
 }
 
 # Plot and save the plots
 sapply(seq(from = 2, to = 10, by = 2), create_plot)
 
-
-
+# Eval on true test set
+registerDoParallel(cores = 20)
+evalDefaultsOpenML(test_split()[1:2], makeLearner("classif.svm"), lst$params)
+stopImplicitCluster()
 
 
 

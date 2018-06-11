@@ -19,7 +19,7 @@ searchDefaults = function(surrogates, par.set, n.defaults = 10, probs = 0.5) {
   for (j in seq_len(n.defaults)) {
     # Search for optimal points given previous defaults
     z = focusSearchDefaults(pfun, surrogates_train, par.set, defaults.perf = defaults.perf)
-    catf("New best y: %f found for x: %s", z$y, paste0(z$x, collapse = ","))
+    catf("New best y: %f found for x: %s", z$y, paste0(z$x, collapse = ", "))
     # Add optimal point to defaults
     defaults.perf = cbind(defaults.perf, z$dsperfs)
     defaults.params = rbind(defaults.params, z$x)
@@ -27,22 +27,24 @@ searchDefaults = function(surrogates, par.set, n.defaults = 10, probs = 0.5) {
   return(defaults.params)
 }
 
+
 # Create an objective function that only requires inputs x (algorithm hyperpars) and defaults.perf (other defaults)
 # @param surrogates List of surrogates
 # @param probs Quantile we want to optimize
 makeObjFunction = function(surrogates_train, probs) {
   force(surrogates)
   force(probs)
+  
   # Predict newdata, compute prediction
   function (x, defaults.perf = NULL) {
-    # Compute predicitons for each surrogate
+    # Compute predicitons for each surrogate model
     prds = sapply(surrogates_train, function(surr) {
       predict(surr, newdata = x)$data$response
     })
-    # For each row in prds.
-    # defaults.perf are earlier found defaults
+    # For each randomly sampled config:
+    # defaults.perf =  defaults from iterations 1, ... , n-1
     ds_quantile = apply(prds, 1, function(x, defaults.perf, probs) {
-      # Compute min of prd and defaults.perf
+      # Compute min of prd and defaults.perf for each dataset
       parmin = apply(cbind(x, defaults.perf), 1, min)
       # and compute quantile over the datasets
       quantile(parmin, probs = probs)
@@ -51,6 +53,7 @@ makeObjFunction = function(surrogates_train, probs) {
   }
 }
 
+
 # Search for nth default
 # @param pfun Objective function
 # @param param.set Parameter set
@@ -58,16 +61,20 @@ makeObjFunction = function(surrogates_train, probs) {
 focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf) {
   
   # Do the focussearch
-  ctrl = makeFocusSearchControl(maxit = 6, restarts = 4, points = points = 10^4)
+  ctrl = makeFocusSearchControl(maxit = 6, restarts = 4, points = 10^4)
+  # For debugging:
+  # ctrl = makeFocusSearchControl(1, 1, points = 30)
   
   # For knn search the full param space
   if (getParamIds(param.set)[1] == "k") 
-    ctrl = makeFocusSearchControl(maxit = 1, restarts = 1, points = points)
+    ctrl = makeFocusSearchControl(maxit = 1, restarts = 2, points = 100)
 
   z = focussearch(pfun, param.set, ctrl, show.info = FALSE, defaults.perf = defaults.perf)
+  # Add performance on the individual datasets
   z$dsperfs = sapply(surrogates_train, function(m) {predict(m, newdata = z$x)$data$response})
   return(z)
 }
+
 
 # Calculate performance for a given set of param in train and test split
 # @param surrogates Surrogate models
@@ -75,21 +82,23 @@ focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf
 # @param n.defauls How many defaults
 # @param probs Quantile to optimize
 getDefaultPerfs = function(surrogates, defaults.params) {
+  
   # Which split do we want to predict on? (train or test datasets)
   # Predict on each split
   prd = sapply(surrogates, function(x) {
     predict(x, newdata = defaults.params)$data$response
   })
-  as.data.frame(prd)
-  prd$split = "test"
-  prd$split[which(names(surrogates %in% train_split()))] = "train"
+  prd = as.data.frame(prd)
+  colnames(prd) = ifelse(colnames(prd) %in% train_split(), paste0(colnames(prd), "_train"), paste0(colnames(prd), "_test"))
   return(prd)
 }
+
 
 # Randomsearch hyperParameters (Used to compare agains found defaults)
 # @param surrogates Surrogate models
 # @param par.set Parameter set
-# @param n.defauls How many defaults
+# @param multiplier Multiplier to compare to
+# @param points Defaults to compare to
 # @param probs Quantile to optimize
 randomSearch = function(surrogates, par.set, multiplier, points) {
   zs = foreach(i = seq_along(surrogates)) %dopar% {
