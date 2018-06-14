@@ -10,7 +10,6 @@ load_all()
 
 
 # Train/Save the surrogates ------------------------------------------------------
-
 lrn.par.sets = getLearnerParSets()
 learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
 
@@ -19,11 +18,9 @@ learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
 # and set extrapolation to 20 in order to not extrapolate to no-data areas to much.
 surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 20)
 
-# foreach(i = 4) %do% { # seq_along(learner.names)
-#   registerDoParallel(19)
-#   train_save_surrogates(surrogate.mlr.lrn, lrn.par.sets[i], learner.names[i])
-#   stopImplicitCluster()
-# }
+registerDoParallel(cores = 19, outfile = "")
+trainSaveSurrogates(surrogate.mlr.lrn, lrn.par.sets, learner.names)
+stopImplicitCluster()
 
 # Extract a grid from the surrogates
 # foreach(i = 4) %do% { # seq_along(learner.names)
@@ -65,7 +62,6 @@ lst = readRDS("defaultLOOCV/Q2_cubist_classif.svm_auc_zscale_.RDS")
 surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
 
 # Get data from randomsearch:
-set.seed(199)
 ys = foreach(points = seq(from = 2, to = 10, by = 2), .combine = "rbind") %:%
   foreach(multiplier = c(1, 2, 4, 8), .combine = "rbind") %do% {
     rs = randomSearch(surrogates$surrogates, surrogates$param.set, multiplier, points)
@@ -102,7 +98,16 @@ create_plot = function(n.defaults) {
 # Plot and save the plots
 sapply(seq(from = 2, to = 10, by = 2), create_plot)
 
-
+# Plot the cummulative error ------------------------------------------------------------
+pdf("defaultLOOCV/cumml_error_Q2")
+tst = lst$preds %>% select(ends_with("test")) %>% apply(2, cummin) %>% apply(1, mean)
+trn = lst$preds %>% select(ends_with("train")) %>% apply(2, cummin) %>% apply(1, mean)
+tst %>% plot(xlab = "nDefaults", ylab = "Avg. standardized Error", ylim = c(-1, -0.5),
+             main = "Test (black) / Train (red) datasets")
+tst %>% lines
+trn %>% points(col = "red")
+trn %>% lines(col = "red")
+dev.off()
 
 # Eval on true test set ------------------------------------------------------------
 registerDoParallel(cores = 32)

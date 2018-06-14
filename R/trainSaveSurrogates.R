@@ -4,26 +4,26 @@
 #'   Can be one of: measures = list(auc, acc, brier)
 #' @param scaling Scaling to use. 
 #'   Can be one of: scaling = c("none", "logit", "zscale", "scale01")
-train_save_surrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, measure = auc, scaling = "zscale") {
+trainSaveSurrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, measure = auc, scaling = "zscale") {
   data.ids = sort(unique(tbl.results$data_id))
   
-  foreach(j = seq_along(learner.names)) %:% {
-    sprintf("Learner %i: %s", j, learner.names[j])
-    set.seed(199 + j)
-    # Surrogate model calculation
-    surrogates = makeSurrogateModels(measure = measure, learner.name = learner.names[j],
+  # Loop over learners, save one file per learner
+  foreach(k = seq_along(learner.names)[5:6]) %do% {
+    sprintf("Learner %i: %s", k, learner.names[k])
+    set.seed(199 + k)
+    # Train the surrogate models
+    surrogates = makeSurrogateModels(measure = measure, learner.name = learner.names[k],
                                      data.ids = data.ids, tbl.results, tbl.metaFeatures, tbl.hypPars,
                                      lrn.par.set, surrogate.mlr.lrn,
                                      scale_before = TRUE, scaling = scaling)
     # Save surrogates
     saveRDS(surrogates, file = paste("surrogates/", surrogate.mlr.lrn$id,
-                                     stri_sub(learner.names[j], from = 5),
+                                     stri_sub(learner.names[k], from = 5),
                                      measure$id, scaling, ".RDS", sep = "_", collapse = "_"))
   }
   messagef("Successfully computed all surrogates")
   return(surrogates)
 }
-
 
 
 #' Create surrogate models for different tasks
@@ -130,29 +130,32 @@ makeBotTable = function(measure, learner.name, tbl.results, tbl.metaFeatures, tb
 #' #' @param surrogate.mlr.lrn Surrogate learner
 #' #' @param measure Name of the measure to optimize.
 #' #'   Can be one of: measures = list(auc, acc, brier)
-#' #' @param scaling Scaling to use. 
+#' #' @param scaling Scaling to use.
 #' #'   Can be one of: scaling = c("none", "logit", "zscale", "scale01")
 #' resample_surrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, measure = auc, scaling = "zscale") {
-#'   
+#' 
 #'   task.data = readRDS(file = "surrogates/task.data.RDS")
 #'   task.data$measure.value = as.numeric(task.data$measure.value)
 #' 
-#'   
+#' 
 #'   dlist = task.data %>%
 #'     select(-fullName) %>%
 #'     filter(data_id %in% train_split()) %>%
 #'     split(.$data_id)
-#'   
+#' 
 #'   registerDoParallel(30)
-#'   coms = c(1, 2, 3, 5, 10, 20, 50)
-#'   surrogate.mlr.lrn = makeLearner("regr.cubist", committees = coms[6], extrapolation = 20)
+#'   surrogate.mlr.lrn = makeLearner("regr.ranger")
 #'   res = foreach(i = seq_along(dlist)) %dopar% {
 #'     t = makeRegrTask(data = dlist[[i]], target = "measure.value")
 #'     t = subsetTask(t, features = which(getTaskFeatureNames(t) != "data_id"))
-#'     resample(surrogate.mlr.lrn, t, resampling = cv3)$aggr
+#'     resample(surrogate.mlr.lrn, t, resampling = cv3, measures = list(medse))$aggr
 #'   }
 #'   mean(sapply(res, mean))
 #'   
+#'   median(sapply(res, mean))
+#' 
+#'   # Cubist:
+#'   # Comittees
 #'   # 1  = 0.001991945
 #'   # 2  = 0.001737474
 #'   # 3  = 0.001633081
@@ -160,5 +163,20 @@ makeBotTable = function(measure, learner.name, tbl.results, tbl.metaFeatures, tb
 #'   # 10 = 0.001558349
 #'   # 20 = 0.001487181 <- we take 20
 #'   # 50 = 0.001486619
+#'   
+#'   # Ranger:
+#'   # ntree
+#'   # 500 0.01255629
+#'   
+#'   
+#'   # Average R-Squared on 19 train data sets:
+#'   # ranger: 2000 trees, extratrees: 0.7605294
+#'   # ranger: 500 trees, variance: 0.9436135
+#'   # cubist: 1 committees: 0.9805122
+#'   # cubist: 20 committees: 0.9766592
+#'   
+#'   # Median medse:
+#'   # Cubist: 5.47534e-06
+#'   # Ranger: 0.0008824672
 #'   
 #' }

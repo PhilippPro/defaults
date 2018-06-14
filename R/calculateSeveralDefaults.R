@@ -100,7 +100,8 @@ getDefaultPerfs = function(surrogates, defaults.params) {
 # @param multiplier Multiplier to compare to
 # @param points Defaults to compare to
 # @param probs Quantile to optimize
-randomSearch = function(surrogates, par.set, multiplier, points) {
+randomSearch = function(surrogates, par.set, multiplier, points, seed = 199) {
+  set.seed(seed)
   zs = foreach(i = seq_along(surrogates)) %dopar% {
     force(surrogates)
     # Create the objective function
