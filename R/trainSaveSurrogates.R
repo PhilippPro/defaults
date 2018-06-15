@@ -54,15 +54,14 @@ makeSurrogateModels = function(measure, learner.name, data.ids, tbl.results,
   } else {
     data.ids = sort(unique(task.data$data_id))
   }
-  
   mlr.mod.measure = foreach(i = seq_along(data.ids)) %dopar% {
     gc()
     print(paste("surrogate train: task", i, "of", length(data.ids)))
     data.idi = data.ids[i]
     
-    mlr.task.measure = makeRegrTask(id = as.character(data.idi),
-                                    subset(task.data, data_id == data.idi,
-                                           select =  c("measure.value", names(param.set$pars))), target = "measure.value")
+    mlr.task.measure = makeRegrTask(id = as.character(data.idi), target = "measure.value",
+                                    data = subset(task.data, data_id == data.idi,
+                                             select =  c("measure.value", names(param.set$pars))))
     train(surrogate.mlr.lrn, mlr.task.measure)
   }
   names(mlr.mod.measure) = data.ids

@@ -31,25 +31,30 @@ searchDefaults = function(surrogates, par.set, n.defaults = 10, probs = 0.5) {
 # Create an objective function that only requires inputs x (algorithm hyperpars) and defaults.perf (other defaults)
 # @param surrogates List of surrogates
 # @param probs Quantile we want to optimize
-makeObjFunction = function(surrogates_train, probs) {
+# @param splits for parallelization
+makeObjFunction = function(surrogates_train, probs, nsplits = 1) {
   force(surrogates)
   force(probs)
   
   # Predict newdata, compute prediction
   function (x, defaults.perf = NULL) {
-    # Compute predicitons for each surrogate model
-    prds = sapply(surrogates_train, function(surr) {
-      predict(surr, newdata = x)$data$response
-    })
-    # For each randomly sampled config:
-    # defaults.perf =  defaults from iterations 1, ... , n-1
-    ds_quantile = apply(prds, 1, function(x, defaults.perf, probs) {
-      # Compute min of prd and defaults.perf for each dataset
-      parmin = apply(cbind(x, defaults.perf), 1, min)
-      # and compute quantile over the datasets
-      quantile(parmin, probs = probs)
-    }, defaults.perf = defaults.perf, probs = probs)
-    return(ds_quantile)
+    # Chunk x into nsplits pars
+    chunks = split(seq_len(nrow(x)), ceiling(seq_len(nrow(x)) / (nrow(x) / nsplits)))
+    # And parallel iterate over the parts
+    ds_quantile = foreach(i = seq_len(nsplits), .combine = "c") %dopar% {
+      # Compute predicitons for each surrogate model
+      prds = sapply(surrogates_train, function(surr) {
+        predict(surr, newdata = x)$data$response
+      })
+      # For each randomly sampled config:
+      # defaults.perf =  defaults from iterations 1, ... , n-1
+      apply(prds, 1, function(x, defaults.perf, probs) {
+          # Compute min of prd and defaults.perf for each dataset
+          parmin = apply(cbind(x, defaults.perf), 1, min)
+          # and compute quantile over the datasets
+          quantile(parmin, probs = probs)
+        }, defaults.perf = defaults.perf, probs = probs)
+    }
   }
 }
 
@@ -67,9 +72,9 @@ focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf
   
   # For knn search the full param space
   if (getParamIds(param.set)[1] == "k") 
-    ctrl = makeFocusSearchControl(maxit = 1, restarts = 2, points = 100)
-
-  z = focussearch(pfun, param.set, ctrl, show.info = FALSE, defaults.perf = defaults.perf)
+    ctrl = makeFocusSearchControl(maxit = 1, restarts = 2, points = 120)
+  
+  z = focussearch(pfun, param.set, ctrl, defaults.perf = defaults.perf, show.info = FALSE)
   # Add performance on the individual datasets
   z$dsperfs = sapply(surrogates_train, function(m) {predict(m, newdata = z$x)$data$response})
   return(z)
@@ -89,7 +94,8 @@ getDefaultPerfs = function(surrogates, defaults.params) {
     predict(x, newdata = defaults.params)$data$response
   })
   prd = as.data.frame(prd)
-  colnames(prd) = ifelse(colnames(prd) %in% train_split(), paste0(colnames(prd), "_train"), paste0(colnames(prd), "_test"))
+  colnames(prd) = ifelse(colnames(prd) %in% train_split(), paste0(colnames(prd), "_train"),
+                         paste0(colnames(prd), "_test"))
   return(prd)
 }
 

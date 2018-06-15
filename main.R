@@ -16,9 +16,11 @@ learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
 # Use cubist as a learner
 # 20 Comittees in order to get a lower mse (25% better then 1 comittee) 
 # and set extrapolation to 20 in order to not extrapolate to no-data areas to much.
-surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 20)
+# Obtained a fixed version of cubist learner from github branch.
+source("https://raw.githubusercontent.com/pfistfl/mlr-extralearner/master/R/RLearner_regr_fixcubist.R")
+surrogate.mlr.lrn = makeLearner("regr.fixcubist", committees = 20, extrapolation = 20)
 
-registerDoParallel(cores = 19, outfile = "")
+registerDoParallel(19)
 trainSaveSurrogates(surrogate.mlr.lrn, lrn.par.sets, learner.names)
 stopImplicitCluster()
 
@@ -33,9 +35,8 @@ stopImplicitCluster()
 
 
 # Forward selection ----------------------------------------------------------------------------------
-defaults = setNames(as.list(numeric(length(learner.names))), stri_sub(learner.names, 13, 100))
-files = list.files("surrogates")[grep(x = list.files("surrogates"), surrogate.mlr.lrn$id)]
-for(i in 4) { # seq_along(learner.names)
+files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist")]
+for(i in c(5, 6)) { # seq_along(learner.names)
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
   
@@ -44,7 +45,6 @@ for(i in 4) { # seq_along(learner.names)
   
   # Search for defaults
   train = searchDefaults(surrogates$surrogates, surrogates$param.set, n.defaults = 10, probs = 0.5)
-  
   # Get performance on train and test data
   prds = getDefaultPerfs(surrogates$surrogates, train)
 
@@ -99,15 +99,15 @@ create_plot = function(n.defaults) {
 sapply(seq(from = 2, to = 10, by = 2), create_plot)
 
 # Plot the cummulative error ------------------------------------------------------------
-pdf("defaultLOOCV/cumml_error_Q2")
-tst = lst$preds %>% select(ends_with("test")) %>% apply(2, cummin) %>% apply(1, mean)
-trn = lst$preds %>% select(ends_with("train")) %>% apply(2, cummin) %>% apply(1, mean)
-tst %>% plot(xlab = "nDefaults", ylab = "Avg. standardized Error", ylim = c(-1, -0.5),
+#pdf("defaultLOOCV/cumml_error_Q2")
+tst = prds %>% select(ends_with("test")) %>% apply(2, cummin) %>% apply(1, mean)
+trn = prds %>% select(ends_with("train")) %>% apply(2, cummin) %>% apply(1, mean)
+tst %>% plot(xlab = "nDefaults", ylab = "Avg. standardized Error", ylim = c(-1, 0.5),
              main = "Test (black) / Train (red) datasets")
 tst %>% lines
 trn %>% points(col = "red")
 trn %>% lines(col = "red")
-dev.off()
+# dev.off()
 
 # Eval on true test set ------------------------------------------------------------
 registerDoParallel(cores = 32)
