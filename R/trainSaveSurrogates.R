@@ -4,13 +4,14 @@
 #'   Can be one of: measures = list(auc, acc, brier)
 #' @param scaling Scaling to use. 
 #'   Can be one of: scaling = c("none", "logit", "zscale", "scale01")
-trainSaveSurrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, measure = auc, scaling = "zscale") {
+trainSaveSurrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, measure = auc,
+  scaling = "zscale") {
   data.ids = sort(unique(tbl.results$data_id))
   
   # Loop over learners, save one file per learner
-  foreach(k = seq_along(learner.names)[5:6]) %do% {
+  foreach(k = seq_along(learner.names)[6]) %do% {
     sprintf("Learner %i: %s", k, learner.names[k])
-    set.seed(199 + k)
+    set.seed(199)
     # Train the surrogate models
     surrogates = makeSurrogateModels(measure = measure, learner.name = learner.names[k],
                                      data.ids = data.ids, tbl.results, tbl.metaFeatures, tbl.hypPars,

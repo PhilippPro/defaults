@@ -38,23 +38,20 @@ makeObjFunction = function(surrogates_train, probs, nsplits = 1) {
   
   # Predict newdata, compute prediction
   function (x, defaults.perf = NULL) {
-    # Chunk x into nsplits pars
-    chunks = split(seq_len(nrow(x)), ceiling(seq_len(nrow(x)) / (nrow(x) / nsplits)))
-    # And parallel iterate over the parts
-    ds_quantile = foreach(i = seq_len(nsplits), .combine = "c") %dopar% {
-      # Compute predicitons for each surrogate model
+      # Compute predictions for each surrogate model
       prds = sapply(surrogates_train, function(surr) {
         predict(surr, newdata = x)$data$response
       })
       # For each randomly sampled config:
       # defaults.perf =  defaults from iterations 1, ... , n-1
-      apply(prds, 1, function(x, defaults.perf, probs) {
+      apply(prds, 1,
+        function(x, defaults.perf, probs) {
           # Compute min of prd and defaults.perf for each dataset
           parmin = apply(cbind(x, defaults.perf), 1, min)
           # and compute quantile over the datasets
           quantile(parmin, probs = probs)
-        }, defaults.perf = defaults.perf, probs = probs)
-    }
+          },
+        defaults.perf = defaults.perf, probs = probs)
   }
 }
 

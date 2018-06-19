@@ -35,8 +35,8 @@ stopImplicitCluster()
 
 
 # Forward selection ----------------------------------------------------------------------------------
-files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist")]
-for(i in c(5, 6)) { # seq_along(learner.names)
+files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.fixcubist")]
+for(i in c(6)) { # seq_along(learner.names)
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
   
@@ -73,7 +73,7 @@ df = data.frame(ys, row.names = NULL) %>%
 colnames(df) = gsub("X", "", colnames(df))
 
 # Plot function
-create_plot = function(n.defaults) {
+create_plot = function(n.defaults, algorithm) {
   def = gather(lst$preds, "dataset", "y") %>%
     separate(dataset, into = c("dataset", "split")) %>%
     group_by(dataset) %>%
@@ -90,13 +90,13 @@ create_plot = function(n.defaults) {
     gather("randomsearch", "delta_y", -one_of("dataset", "split")) %>%
     mutate(randomsearch = factor(randomsearch, levels = c("x1", "x2", "x4", "x8"))) %>%
     ggplot(aes(x = randomsearch, y = delta_y)) +
-    geom_boxplot() + facet_wrap(~split) + 
+    geom_boxplot(notch = TRUE) + facet_wrap(~split) + 
     ggtitle(paste0("Using ", n.defaults, " defaults"))
-  ggsave(p, filename = paste0("defaultLOOCV/d", n.defaults, "svm", "Q2", ".png"))
+  ggsave(p, filename = paste0("defaultLOOCV/d", n.defaults, algorithm, "Q2", ".png"))
   return(NULL)
 }
 # Plot and save the plots
-sapply(seq(from = 2, to = 10, by = 2), create_plot)
+sapply(seq(from = 2, to = 10, by = 2), create_plot, algorithm = "xgboost")
 
 # Plot the cummulative error ------------------------------------------------------------
 #pdf("defaultLOOCV/cumml_error_Q2")
