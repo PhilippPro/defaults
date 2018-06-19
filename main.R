@@ -18,7 +18,7 @@ learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
 # and set extrapolation to 20 in order to not extrapolate to no-data areas to much.
 # Obtained a fixed version of cubist learner from github branch.
 source("https://raw.githubusercontent.com/pfistfl/mlr-extralearner/master/R/RLearner_regr_fixcubist.R")
-surrogate.mlr.lrn = makeLearner("regr.fixcubist", committees = 20, extrapolation = 20)
+surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 20)
 
 registerDoParallel(19)
 trainSaveSurrogates(surrogate.mlr.lrn, lrn.par.sets, learner.names)
@@ -59,6 +59,7 @@ for(i in c(6)) { # seq_along(learner.names)
 # Create Plots comparing to random search ------------------------------------------------------------
 # Read in found defaults and surrogates
 lst = readRDS("defaultLOOCV/Q2_cubist_classif.svm_auc_zscale_.RDS")
+i = 4
 surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
 
 # Get data from randomsearch:
@@ -72,7 +73,7 @@ df = data.frame(ys, row.names = NULL) %>%
 colnames(df) = gsub("X", "", colnames(df))
 
 # Plot function
-create_plot = function(n.defaults, algorithm) {
+create_plot = function(lst, df, n.defaults, algorithm) {
   def = gather(lst$preds, "dataset", "y") %>%
     separate(dataset, into = c("dataset", "split")) %>%
     group_by(dataset) %>%
@@ -91,24 +92,23 @@ create_plot = function(n.defaults, algorithm) {
     ggplot(aes(x = randomsearch, y = delta_y)) +
     stat_boxplot(geom ='errorbar', width = 0.5) +
     geom_boxplot(notch = FALSE) +
-    stat_boxplot(geom ='middle', color = "orange") +
     facet_wrap(~split) + 
     ggtitle(paste0("Using ", n.defaults, " defaults"))
   ggsave(p, filename = paste0("defaultLOOCV/d", n.defaults, algorithm, "Q2", ".png"))
   return(NULL)
 }
 # Plot and save the plots
-sapply(seq(from = 2, to = 10, by = 2), create_plot, algorithm = "svm")
+sapply(seq(from = 2, to = 10, by = 2), create_plot, algorithm = "svm", lst = lst, df = df)
 
 # Plot the cummulative error ------------------------------------------------------------
 #pdf("defaultLOOCV/cumml_error_Q2")
-tst = prds %>% select(ends_with("test")) %>% apply(2, cummin) %>% apply(1, mean)
-trn = prds %>% select(ends_with("train")) %>% apply(2, cummin) %>% apply(1, mean)
-tst %>% plot(xlab = "nDefaults", ylab = "Avg. standardized Error", ylim = c(-1, 0.5),
-             main = "Test (black) / Train (red) datasets")
-tst %>% lines
-trn %>% points(col = "red")
-trn %>% lines(col = "red")
+# tst = prds %>% select(ends_with("test")) %>% apply(2, cummin) %>% apply(1, mean)
+# trn = prds %>% select(ends_with("train")) %>% apply(2, cummin) %>% apply(1, mean)
+# tst %>% plot(xlab = "nDefaults", ylab = "Avg. standardized Error", ylim = c(-1, 0.5),
+#              main = "Test (black) / Train (red) datasets")
+# tst %>% lines
+# trn %>% points(col = "red")
+# trn %>% lines(col = "red")
 # dev.off()
 
 # Eval on true test set ------------------------------------------------------------
