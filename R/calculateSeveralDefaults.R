@@ -105,19 +105,21 @@ getDefaultPerfs = function(surrogates, defaults.params) {
 # @param probs Quantile to optimize
 randomSearch = function(surrogates, par.set, multiplier, points, seed = 199) {
   set.seed(seed)
-  zs = foreach(i = seq_along(surrogates)) %dopar% {
-    force(surrogates)
-    # Create the objective function
-    pfun = function (x, i) {
-      # Compute predicitons for each surrogate
-      prds = predict(surrogates[[i]], newdata = x)$data$response
-      return(prds)
-    }
-    # Do the RandomSearch
-    ctrl = makeFocusSearchControl(maxit = 1, restarts = 1, points = multiplier * points)
-    z = focussearch(pfun, par.set, ctrl, show.info = FALSE, i = i)
-    return(z)
+
+  newdesign = generateRandomDesign(multiplier * points, par.set, trafo = TRUE)
+  newdesign = deleteNA(newdesign)
+  newdesign = convertDataFrameCols(newdesign, ints.as.num = TRUE,  logicals.as.factor = TRUE)
+  # Make sure we have enough points in newdesign and not too many
+  while (nrow(newdesign) < multiplier * points) {
+    n2 = generateRandomDesign(multiplier * points, par.set, trafo = TRUE)
+    n2 = deleteNA(n2)
+    n2 = convertDataFrameCols(n2, ints.as.num = TRUE,  logicals.as.factor = TRUE)
+    newdesign = rbind(newdesign, n2)
   }
+  newdesign = newdesign[seq_len(multiplier * points), ]
+
+  zs = sapply(surrogates, function(x) {predict(x, newdata = newdesign)$data$response})
+  zs = apply(zs, 2, min)
   names(zs) = names(surrogates)
   return(zs)
 }

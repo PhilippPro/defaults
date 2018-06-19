@@ -35,7 +35,7 @@ stopImplicitCluster()
 
 
 # Forward selection ----------------------------------------------------------------------------------
-files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.fixcubist")]
+files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist")]
 for(i in c(6)) { # seq_along(learner.names)
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
@@ -64,8 +64,7 @@ surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names
 # Get data from randomsearch:
 ys = foreach(points = seq(from = 2, to = 10, by = 2), .combine = "rbind") %:%
   foreach(multiplier = c(1, 2, 4, 8), .combine = "rbind") %do% {
-    rs = randomSearch(surrogates$surrogates, surrogates$param.set, multiplier, points)
-    extractSubList(rs, "y")
+    randomSearch(surrogates$surrogates, surrogates$param.set, multiplier, points)
   }
 df = data.frame(ys, row.names = NULL) %>%
   mutate(points = rep(seq(from = 2, to = 10, by = 2), each = 4),
@@ -90,13 +89,16 @@ create_plot = function(n.defaults, algorithm) {
     gather("randomsearch", "delta_y", -one_of("dataset", "split")) %>%
     mutate(randomsearch = factor(randomsearch, levels = c("x1", "x2", "x4", "x8"))) %>%
     ggplot(aes(x = randomsearch, y = delta_y)) +
-    geom_boxplot(notch = TRUE) + facet_wrap(~split) + 
+    stat_boxplot(geom ='errorbar', width = 0.5) +
+    geom_boxplot(notch = FALSE) +
+    stat_boxplot(geom ='middle', color = "orange") +
+    facet_wrap(~split) + 
     ggtitle(paste0("Using ", n.defaults, " defaults"))
   ggsave(p, filename = paste0("defaultLOOCV/d", n.defaults, algorithm, "Q2", ".png"))
   return(NULL)
 }
 # Plot and save the plots
-sapply(seq(from = 2, to = 10, by = 2), create_plot, algorithm = "xgboost")
+sapply(seq(from = 2, to = 10, by = 2), create_plot, algorithm = "svm")
 
 # Plot the cummulative error ------------------------------------------------------------
 #pdf("defaultLOOCV/cumml_error_Q2")
