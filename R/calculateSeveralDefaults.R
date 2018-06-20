@@ -49,7 +49,7 @@ makeObjFunction = function(surrogates_train, probs, nsplits = 1) {
           # Compute min of prd and defaults.perf for each dataset
           parmin = apply(cbind(x, defaults.perf), 1, min)
           # and compute quantile over the datasets
-          quantile(parmin, probs = probs)
+          mean(parmin, na.rm = TRUE) # quantile(parmin, probs = probs)
           },
         defaults.perf = defaults.perf, probs = probs)
   }

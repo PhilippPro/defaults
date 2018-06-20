@@ -36,7 +36,7 @@ stopImplicitCluster()
 
 # Forward selection ----------------------------------------------------------------------------------
 files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist")]
-for(i in c(6)) { # seq_along(learner.names)
+for(i in c(4)) { # seq_along(learner.names)
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
   
@@ -49,7 +49,7 @@ for(i in c(6)) { # seq_along(learner.names)
   prds = getDefaultPerfs(surrogates$surrogates, train)
 
   saveRDS(list("preds" = prds, "params" = train),
-          stri_paste("defaultLOOCV/Q2",
+          stri_paste("defaultLOOCV/MEAN",
             gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
   gc()
 }
