@@ -33,8 +33,8 @@ stopImplicitCluster()
 
 
 # Forward selection ----------------------------------------------------------------------------------
-files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist")]
-for(i in c(4)) { # seq_along(learner.names)
+files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist_classif")]
+for(i in c(2)) { # seq_along(learner.names)
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
   
@@ -42,13 +42,35 @@ for(i in c(4)) { # seq_along(learner.names)
   surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
   
   # Search for defaults
-  train = searchDefaults(surrogates$surrogates[train_split()],
-    surrogates$param.set, n.defaults = 10, probs = 0.5)
-  # Get performance on train and test data
-  prds = getDefaultPerfs(surrogates$surrogates, train)
-
-  saveRDS(list("preds" = prds, "params" = train),
-          stri_paste("defaultLOOCV/MEAN",
+  rin = makeResampleInstance(makeResampleDesc("CV", iters = 19), size = 38)
+  
+  registerDoParallel(30)
+  
+  # Iterate over ResampleInstance and its indices
+  defs = foreach(it = seq_len(rin$desc$iters)) %dopar% {
+    # Search for defaults
+    defs = searchDefaults(surrogates$surrogates[rin$train.inds[[it]]], surrogates$param.set,
+      n.defaults = 10, probs = 0.5)
+    return(defs)
+  }
+  
+  # Evaluate found defaults on OpenML
+  n.defs = 2 # c(2, 4, 6, 8, 10)
+  res = foreach(it = seq_len(rin$desc$iters)) %:%
+    foreach(n = n.defs) %dopar% {
+      evalDefaultsOpenML(
+        task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
+        lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
+        defaults = defs[[it]],
+        ps = surrogates$param.set,
+        n = n)
+    }
+  oml.res = do.call("bind_rows", res)
+  
+  stopImplicitCluster()
+  
+  saveRDS(list("oob.perf" = oml.res, "defaults" = defs),
+          stri_paste("defaultLOOCV/Q2",
             gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
   gc()
 }

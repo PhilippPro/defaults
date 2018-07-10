@@ -36,7 +36,7 @@ makeObjFunction = function(surrogates_train, probs) {
   
   # Helper function, that first computes the minimum over all 
   # defaults and then the quantile. This is the core idea of reducing
-  # default search to a single number we can optimize
+  # default search to a single number , which can be optimized
   defaultsMinQuantile = function(x, defaults.perf, probs) {
     # Compute min of prd and defaults.perf for each dataset
     parmin = apply(cbind(x, defaults.perf), 1, min)
