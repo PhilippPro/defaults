@@ -79,47 +79,42 @@ for(i in c(2)) { # seq_along(learner.names)
 
 # Create Plots comparing to random search ------------------------------------------------------------
 # Read in found defaults and surrogates
-lst = readRDS("defaultLOOCV/MEAN_cubist_classif.svm_auc_zscale_.RDS")
-i = 4
-surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
+lst = readRDS("defaultLOOCV/Q2_cubist_classif.rpart_auc_zscale_.RDS")
 
-# Get data from randomsearch:
-ys = foreach(points = seq(from = 2, to = 10, by = 2), .combine = "rbind") %:%
-  foreach(multiplier = c(1, 2, 4, 8), .combine = "rbind") %do% {
-    randomSearch(surrogates$surrogates, surrogates$param.set, multiplier, points)
-  }
-df = data.frame(ys, row.names = NULL) %>%
-  mutate(points = rep(seq(from = 2, to = 10, by = 2), each = 4),
-         multiplier = rep(paste0("x", c(1, 2, 4, 8)), times = 5))
-colnames(df) = gsub("X", "", colnames(df))
+library(ggpubr)
+library(patchwork)
 
-# Plot function
-create_plot = function(lst, df, n.defaults, algorithm) {
-  def = gather(lst$preds, "dataset", "y") %>%
-    separate(dataset, into = c("dataset", "split")) %>%
-    group_by(dataset) %>%
-    filter(row_number() <= n.defaults) %>%
-    summarise(y = min(y))
-  rnd = df %>% filter(points == n.defaults) %>%
-    gather("dataset", "y", -one_of(c("points", "multiplier"))) %>%
-    select(-points) %>% spread("multiplier", "y")
-  p = inner_join(def, rnd, by = "dataset") %>%
-    mutate("x1" = y - x1, "x2" = y - x2, "x4" =  y - x4, "x8" = y - x8) %>%
-    mutate(split = ifelse(dataset %in% train_split(), "train", "test")) %>%
-    mutate(split = factor(split, levels = c("train", "test"))) %>%
-    select(-y) %>%
-    gather("randomsearch", "delta_y", -one_of("dataset", "split")) %>%
-    mutate(randomsearch = factor(randomsearch, levels = c("x1", "x2", "x4", "x8"))) %>%
-    ggplot(aes(x = randomsearch, y = delta_y)) +
-    stat_boxplot(geom ='errorbar', width = 0.5) +
-    geom_boxplot(notch = FALSE) +
-    facet_wrap(~split) + 
-    ggtitle(paste0("Using ", n.defaults, " defaults"))
-  ggsave(p, filename = paste0("defaultLOOCV/d", n.defaults, algorithm, "Mean", ".png"))
-  return(NULL)
-}
-# Plot and save the plots
-sapply(seq(from = 2, to = 10, by = 2), create_plot, algorithm = "svm", lst = lst, df = df)
+# Boxplot of the different methods
+p <- ggboxplot(
+  lst$oob.perf, x = "search.type", y = "auc.test.mean", color = "search.type",
+  palette =c("#00AFBB", "#E7B800", "#FC4E07"),
+  add = "jitter") +
+  ggtitle("Performance for 2 defaults")
+
+# Boxplot comparing to default search
+g = lst$oob.perf %>% 
+  left_join(lst$oob.perf %>%
+    filter(search.type == "default") %>%
+    mutate(
+      auc.def = auc.test.mean,
+      acc.def = acc.test.join,
+      f1.def = f1.test.mean
+      ),
+    by = c("task.id", "learner.id")) %>%
+  mutate(
+    delta_auc = auc.test.mean.x - auc.def,
+    delta_acc = acc.test.join.x - acc.def,
+    delta_f1 = f1.test.mean.x - f1.def
+    ) %>%
+  filter(search.type.x != "default") %>%
+  ggboxplot(x = "search.type.x", y = "delta_auc", color = "search.type.x",
+    palette =c("#00AFBB", "#E7B800", "#FC4E07"),
+    add = "jitter") +
+  geom_abline(intercept = 0, slope = 0) +
+  coord_cartesian(ylim = c(-0.4, 0.05)) +
+  ggtitle("Performance difference to defaults for n = 2 defaults")
+
+ggsave((p + g), filename = paste0("defaultLOOCV/d", 2, unique(lst$oob.perf$learner.id), "Q2", ".png"), scale = 2)
 
 # Plot the cummulative error ------------------------------------------------------------
 #pdf("defaultLOOCV/cumml_error_Q2")

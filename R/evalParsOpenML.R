@@ -33,7 +33,7 @@ evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, n) {
   # Loop over Hold-Out Datasets
   res = lapply(seq_len(length(tasks)), function(i) {
     # Define inner Resampling Scheme
-    inner.rdesc = hout
+    inner.rdesc = cv10
     
     # Only take the first 'n' defaults
     defaults = defaults[seq_len(n), ]
@@ -51,8 +51,13 @@ evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, n) {
     lrn.rnd4 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 4 * nrow(defaults)))
     res.rndx4 = evalParsOpenML(tasks[[i]], lrn.rnd4)
     
+    # Search randomly (8x randomsearch)
+    lrn.rnd8 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 8 * nrow(defaults)))
+    res.rndx8 = evalParsOpenML(tasks[[i]], lrn.rnd8)
+    
     # Return a data.frame
-    df = bind_rows("default" = res.def, "rndX2" = res.rndx2, "rndX4" = res.rndx4, .id = "search.type")
+    df = bind_rows("defaults" = res.def, "X2" = res.rndx2, "X4" = res.rndx4,
+      "X8" = res.rndx8, .id = "search.type")
     df$n.defaults = n
     return(df)
   })
