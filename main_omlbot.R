@@ -32,8 +32,6 @@ stopImplicitCluster()
 # }
 
 
-
-
 # Forward selection ----------------------------------------------------------------------------------
 files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist")]
 for(i in c(4)) { # seq_along(learner.names)
@@ -44,7 +42,8 @@ for(i in c(4)) { # seq_along(learner.names)
   surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
   
   # Search for defaults
-  train = searchDefaults(surrogates$surrogates, surrogates$param.set, n.defaults = 10, probs = 0.5)
+  train = searchDefaults(surrogates$surrogates[train_split()],
+    surrogates$param.set, n.defaults = 10, probs = 0.5)
   # Get performance on train and test data
   prds = getDefaultPerfs(surrogates$surrogates, train)
 
@@ -58,7 +57,7 @@ for(i in c(4)) { # seq_along(learner.names)
 
 # Create Plots comparing to random search ------------------------------------------------------------
 # Read in found defaults and surrogates
-lst = readRDS("defaultLOOCV/Q2_cubist_classif.svm_auc_zscale_.RDS")
+lst = readRDS("defaultLOOCV/MEAN_cubist_classif.svm_auc_zscale_.RDS")
 i = 4
 surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
 
@@ -94,7 +93,7 @@ create_plot = function(lst, df, n.defaults, algorithm) {
     geom_boxplot(notch = FALSE) +
     facet_wrap(~split) + 
     ggtitle(paste0("Using ", n.defaults, " defaults"))
-  ggsave(p, filename = paste0("defaultLOOCV/d", n.defaults, algorithm, "Q2", ".png"))
+  ggsave(p, filename = paste0("defaultLOOCV/d", n.defaults, algorithm, "Mean", ".png"))
   return(NULL)
 }
 # Plot and save the plots

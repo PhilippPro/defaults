@@ -27,6 +27,48 @@ trainSaveSurrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, me
 }
 
 
+#' Train and save surrogate models on perTask data
+#' @param surrogate.mlr.lrn Surrogate learner
+#' @param measure Name of the measure to optimize.
+#'   Can be one of: measures = list(auc, acc, brier)
+#' @param scaling Scaling to use. 
+#'   Can be one of: scaling = c("none", "logit", "zscale", "scale01")
+trainSaveSurrogates_pertask = function(surrogate.mlr.lrn, scaling = "zscale") {
+  
+  trainOnData = function(data, surrogate.mlr.lrn, task.id) {
+    data = data[data$task_id == task.id & !is.na(data$y), ]
+    data$task_id = NULL
+    if (length(dim(data)) != 2)
+      return(NULL)
+    tsk = makeRegrTask(data = data, target = "y")
+    tsk = impute(tsk, classes = list("numeric" = -11))
+    train(surrogate.mlr.lrn, removeConstantFeatures(tsk$task))
+  }
+  
+  foreach(arff = list.files("pertask", full.names = TRUE)) %do% {
+
+    # Read data
+    df = readARFF(arff) %>%
+      filter(y != 1) %>%
+      group_by(task_id) %>%
+      mutate(y = scale(y)) %>%
+      ungroup() %>%
+      as.data.frame()
+  
+    # Compute surrogates
+    surrogates = foreach(task.id = unique(df$task_id)) %dopar% {
+      sprintf("Learner: %s", basename(arff))
+      set.seed(199)
+      trainOnData(df, surrogate.mlr.lrn, task.id)
+    }
+    
+    # Save surrogates
+    saveRDS(surrogates, file = paste("surrogates/", surrogate.mlr.lrn$id,
+      basename(arff), "zscale", ".RDS", sep = "_", collapse = "_"))
+  }
+  messagef("Successfully computed all surrogates")
+  return(surrogates)
+}
 #' Create surrogate models for different tasks
 #' @param measure Name of the measure to optimize
 #' @param learner.name Name of learner
@@ -41,7 +83,8 @@ makeSurrogateModels = function(measure, learner.name, data.ids, tbl.results,
                                tbl.metaFeatures, tbl.hypPars, lrn.par.set, surrogate.mlr.lrn, scale_before = TRUE, scaling = "none") {
   
   
-  param.set = lrn.par.set[[which(names(lrn.par.set) == paste0(substr(learner.name, 5, 100), ".set"))]]$param.set
+  param.set = lrn.par.set[[which(names(lrn.par.set) == paste0(substr(learner.name, 5, 100),
+    ".set"))]]$param.set
   
   #train mlr model on full table for measure
   task.data = makeBotTable(measure, learner.name, tbl.results, tbl.metaFeatures, tbl.hypPars, param.set, data.ids, scale_before, scaling)

@@ -7,3 +7,5 @@
 *.feather
 *.zip
 *.Rbuildignore
+*.arff
+

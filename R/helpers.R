@@ -1,17 +1,17 @@
 getSimpleLearners = function(){
   # Simple learner param set
   simple.lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.glmnet", predict.type = "prob"),
-                                     param.set = makeParamSet(
-                                       makeNumericParam("alpha", lower = 0, upper = 1, default = 1),
-                                       makeNumericVectorParam("lambda", len = 1L, lower = -10, upper = 10, default = 0 ,trafo = function(x) 2^x)))
+    param.set = makeParamSet(
+      makeNumericParam("alpha", lower = 0, upper = 1, default = 1),
+      makeNumericVectorParam("lambda", len = 1L, lower = -10, upper = 10, default = 0 ,trafo = function(x) 2^x)))
   
   simple.lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.rpart", predict.type = "prob"), 
-                                     param.set = makeParamSet(
-                                       makeNumericParam("cp", lower = 0, upper = 1, default = 0.01),
-                                       makeIntegerParam("maxdepth", lower = 1, upper = 30, default = 30),
-                                       makeIntegerParam("minbucket", lower = 1, upper = 60, default = 1),
-                                       makeIntegerParam("minsplit", lower = 1, upper = 60, default = 20)), 
-                                     lrn.ps.sets = simple.lrn.par.set)
+    param.set = makeParamSet(
+      makeNumericParam("cp", lower = 0, upper = 1, default = 0.01),
+      makeIntegerParam("maxdepth", lower = 1, upper = 30, default = 30),
+      makeIntegerParam("minbucket", lower = 1, upper = 60, default = 1),
+      makeIntegerParam("minsplit", lower = 1, upper = 60, default = 20)), 
+    lrn.ps.sets = simple.lrn.par.set)
   
   return(simple.lrn.par.set)
 }
@@ -21,47 +21,47 @@ getLearnerParSets = function(){
   
   # increase to a general param set
   lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.kknn", predict.type = "prob"), 
-                              param.set = makeParamSet(
-                                makeIntegerParam("k", lower = 1, upper = 30)),
-                              lrn.ps.sets = simple.lrn.par.set)
+    param.set = makeParamSet(
+      makeIntegerParam("k", lower = 1, upper = 30)),
+    lrn.ps.sets = simple.lrn.par.set)
   
   lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.svm", predict.type = "prob"), 
-                              param.set = makeParamSet(
-                                makeDiscreteParam("kernel", values = c("linear", "polynomial", "radial")),
-                                makeNumericParam("cost", lower = -10, upper = 10, trafo = function(x) 2^x),
-                                makeNumericParam("gamma", lower = -10, upper = 10, trafo = function(x) 2^x, requires = quote(kernel == "radial")),
-                                makeIntegerParam("degree", lower = 2, upper = 5, requires = quote(kernel == "polynomial"))),
-                              lrn.ps.sets = lrn.par.set)
+    param.set = makeParamSet(
+      makeDiscreteParam("kernel", values = c("linear", "polynomial", "radial")),
+      makeNumericParam("cost", lower = -10, upper = 10, trafo = function(x) 2^x),
+      makeNumericParam("gamma", lower = -10, upper = 10, trafo = function(x) 2^x, requires = quote(kernel == "radial")),
+      makeIntegerParam("degree", lower = 2, upper = 5, requires = quote(kernel == "polynomial"))),
+    lrn.ps.sets = lrn.par.set)
   
   lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.ranger", predict.type = "prob"), 
-                              param.set = makeParamSet(
-                                makeIntegerParam("num.trees", lower = 1, upper = 2000),
-                                makeLogicalParam("replace"),
-                                makeNumericParam("sample.fraction", lower = 0.1, upper = 1),
-                                makeNumericParam("mtry", lower = 0, upper = 1),
-                                makeLogicalParam(id = "respect.unordered.factors"),
-                                makeNumericParam("min.node.size", lower = 0, upper = 1)),
-                              lrn.ps.sets = lrn.par.set)
+    param.set = makeParamSet(
+      makeIntegerParam("num.trees", lower = 1, upper = 2000),
+      makeLogicalParam("replace"),
+      makeNumericParam("sample.fraction", lower = 0.1, upper = 1),
+      makeNumericParam("mtry", lower = 0, upper = 1),
+      makeLogicalParam(id = "respect.unordered.factors"),
+      makeNumericParam("min.node.size", lower = 0, upper = 1)),
+    lrn.ps.sets = lrn.par.set)
   
   lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.xgboost", predict.type = "prob"), 
-                              param.set = makeParamSet(
-                                makeIntegerParam("nrounds", lower = 1, upper = 5000), 
-                                makeNumericParam("eta", lower = -10, upper = 0, trafo = function(x) 2^x),
-                                makeNumericParam("subsample",lower = 0.1, upper = 1),
-                                makeDiscreteParam("booster", values = c("gbtree", "gblinear")),
-                                makeIntegerParam("max_depth", lower = 1, upper = 15, requires = quote(booster == "gbtree")),
-                                makeNumericParam("min_child_weight", lower = 0, upper = 7, requires = quote(booster == "gbtree"), trafo = function(x) 2^x),
-                                makeNumericParam("colsample_bytree", lower = 0, upper = 1, requires = quote(booster == "gbtree")),
-                                makeNumericParam("colsample_bylevel", lower = 0, upper = 1, requires = quote(booster == "gbtree")),
-                                makeNumericParam("lambda", lower = -10, upper = 10, trafo = function(x) 2^x),
-                                makeNumericParam("alpha", lower = -10, upper = 10, trafo = function(x) 2^x)),
-                              lrn.ps.sets = lrn.par.set)
+    param.set = makeParamSet(
+      makeIntegerParam("nrounds", lower = 1, upper = 5000), 
+      makeNumericParam("eta", lower = -10, upper = 0, trafo = function(x) 2^x),
+      makeNumericParam("subsample",lower = 0.1, upper = 1),
+      makeDiscreteParam("booster", values = c("gbtree", "gblinear")),
+      makeIntegerParam("max_depth", lower = 1, upper = 15, requires = quote(booster == "gbtree")),
+      makeNumericParam("min_child_weight", lower = 0, upper = 7, requires = quote(booster == "gbtree"), trafo = function(x) 2^x),
+      makeNumericParam("colsample_bytree", lower = 0, upper = 1, requires = quote(booster == "gbtree")),
+      makeNumericParam("colsample_bylevel", lower = 0, upper = 1, requires = quote(booster == "gbtree")),
+      makeNumericParam("lambda", lower = -10, upper = 10, trafo = function(x) 2^x),
+      makeNumericParam("alpha", lower = -10, upper = 10, trafo = function(x) 2^x)),
+    lrn.ps.sets = lrn.par.set)
   
   return(lrn.par.set)
 }
 
 makeLrnPsSets = function(learner, param.set, lrn.ps.sets = NULL, 
-                         id = paste0(learner$id, ".set"), overwrite = FALSE) {
+  id = paste0(learner$id, ".set"), overwrite = FALSE) {
   
   assertClass(learner, "Learner")
   assertClass(param.set, "ParamSet")
@@ -70,7 +70,7 @@ makeLrnPsSets = function(learner, param.set, lrn.ps.sets = NULL,
     ls = list(learner = learner, param.set = param.set)
   } else {
     stop(paste("The following parameters in param.set are not included in learner:", 
-               paste(names(param.set$pars[par.match == FALSE]), collapse = ", ")))
+      paste(names(param.set$pars[par.match == FALSE]), collapse = ", ")))
   }
   
   if(is.null(lrn.ps.sets)){
@@ -104,6 +104,33 @@ deleteNA = function(task.data) {
   task.data
 }
 
+makePertastkParamSet = function() {
+  list(
+    ps.adaboost = makeParamSet(
+      makeDiscreteParam(id = "algorithm", values = c("SAMME", "SAMME.R")),
+      makeNumericParam(id = "learning_rate", lower = 0.01, upper = 2.0),
+      makeIntegerParam(id = "max_depth", lower = 1, upper = 20),
+      makeIntegerParam(id = "n_estimators", lower = 50, upper = 500),
+      makeDiscreteParam(id = "strategy", values = c("median", "most_frequent", "mean"))
+    ),
+    ps.svm_svc = makeParamSet(
+      makeDiscreteParam(id = "kernel", values = c("poly", "sigmoid", "rbf")),
+      makeNumericParam(id = "coef0", lower = -1, upper = 1),
+      makeNumericParam(id = "gamma", lower = 0.00003, upper = 7.999292),
+      makeNumericParam(id = "tol", lower = 10^-5, upper = 10^-1),
+      makeIntegerParam(id = "degree", lower = 1, upper = 5),
+      makeLogicalParam("shrinking"),
+      makeDiscreteParam(id = "strategy", values = c("median", "most_frequent", "mean"))
+    ),
+    ps.random_forest = makeParamSet(
+      makeDiscreteParam(id = "criterion", values = c("entropy", "gini")),
+      makeNumericParam(id = "max_features", lower = 0.1, upper = 0.9),
+      makeIntegerParam(id = "min_samples_leaf", lower = 1, upper = 20),
+      makeIntegerParam(id = "min_samples_split", lower = 1, upper = 20),
+      makeDiscreteParam(id = "strategy", values = c("median", "most_frequent", "mean"))
+    )
+  )
+}
 
 convertParamType = function(x, param_type) {
   if(param_type %in% c("integer", "numeric", "numericvector")) 
@@ -112,6 +139,12 @@ convertParamType = function(x, param_type) {
     x = as.factor(x)
   return(x)
 }
+
+
+
+
+
+
 
 # # Create Train/Test Splits: 
 # set.seed(199)
@@ -142,4 +175,18 @@ test_split = function(which = "data.id") {
       14966L, 34537L, 145677L, 145804L, 145833L, 145836L, 145847L, 
       145853L, 145857L, 145872L, 145878L, 146012L, 146064L, 168295L)
   }
+}
+
+train_split_pertask = function() {
+  c(96L, 31L, 9L, 86L, 76L, 90L, 84L, 62L, 64L, 98L, 78L, 68L, 
+    88L, 61L, 10L, 97L, 74L, 93L, 52L, 56L, 2L, 92L, 32L, 71L, 17L, 
+    24L, 65L, 39L, 41L, 49L, 83L, 7L, 20L, 43L, 87L, 21L, 42L, 70L, 
+    3L, 26L, 57L, 69L, 14L, 33L, 89L, 59L, 82L, 4L, 75L, 34L)
+}
+
+test_split_pertask = function() {
+  c(1L, 5L, 6L, 8L, 11L, 12L, 13L, 15L, 16L, 18L, 19L, 22L, 23L, 
+    25L, 27L, 28L, 29L, 30L, 35L, 36L, 37L, 38L, 40L, 44L, 45L, 46L, 
+    47L, 48L, 50L, 51L, 53L, 54L, 55L, 58L, 60L, 63L, 66L, 67L, 72L, 
+    73L, 77L, 79L, 80L, 81L, 85L, 91L, 94L, 95L, 99L, 100L)
 }

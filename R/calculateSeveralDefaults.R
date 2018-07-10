@@ -3,10 +3,8 @@
 # @param par.set Parameter set
 # @param n.defauls How many defaults
 # @param probs Quantile to optimize
-searchDefaults = function(surrogates, par.set, n.defaults = 10, probs = 0.5) {
+searchDefaults = function(surrogates_train, par.set, n.defaults = 10, probs = 0.5) {
   
-  # Use only train set
-  surrogates_train = surrogates[train_split()]
   # Create the objective function we want to optimize
   pfun = makeObjFunction(surrogates_train, probs)
   
@@ -28,13 +26,23 @@ searchDefaults = function(surrogates, par.set, n.defaults = 10, probs = 0.5) {
 }
 
 
-# Create an objective function that only requires inputs x (algorithm hyperpars) and defaults.perf (other defaults)
+# Create an objective function that only requires inputs x (algorithm hyperpars) and 
+# defaults.perf (defaults found in earlier iterations)
 # @param surrogates List of surrogates
 # @param probs Quantile we want to optimize
-# @param splits for parallelization
-makeObjFunction = function(surrogates_train, probs, nsplits = 1) {
+makeObjFunction = function(surrogates_train, probs) {
   force(surrogates)
   force(probs)
+  
+  # Helper function, that first computes the minimum over all 
+  # defaults and then the quantile. This is the core idea of reducing
+  # default search to a single number we can optimize
+  defaultsMinQuantile = function(x, defaults.perf, probs) {
+    # Compute min of prd and defaults.perf for each dataset
+    parmin = apply(cbind(x, defaults.perf), 1, min)
+    # and compute quantile over the datasets
+    quantile(parmin, probs = probs)
+  }
   
   # Predict newdata, compute prediction
   function (x, defaults.perf = NULL) {
@@ -43,17 +51,12 @@ makeObjFunction = function(surrogates_train, probs, nsplits = 1) {
         predict(surr, newdata = x)$data$response
       })
       # For each randomly sampled config:
-      # defaults.perf =  defaults from iterations 1, ... , n-1
-      apply(prds, 1,
-        function(x, defaults.perf, probs) {
-          # Compute min of prd and defaults.perf for each dataset
-          parmin = apply(cbind(x, defaults.perf), 1, min)
-          # and compute quantile over the datasets
-          mean(parmin, na.rm = TRUE) # quantile(parmin, probs = probs)
-          },
+      # defaults.perf are the defaults from iterations 1, ... , n-1
+      apply(prds, 1, defaultsMinQuantile,
         defaults.perf = defaults.perf, probs = probs)
   }
 }
+
 
 
 # Search for nth default
@@ -63,7 +66,7 @@ makeObjFunction = function(surrogates_train, probs, nsplits = 1) {
 focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf) {
   
   # Do the focussearch
-  ctrl = makeFocusSearchControl(maxit = 6, restarts = 4, points = 10^4)
+  ctrl = makeFocusSearchControl(maxit = 4, restarts = 4, points = 10^3)
   # For debugging:
   # ctrl = makeFocusSearchControl(1, 1, points = 30)
   
@@ -83,7 +86,7 @@ focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf
 # @param par.set Parameter set
 # @param n.defauls How many defaults
 # @param probs Quantile to optimize
-getDefaultPerfs = function(surrogates, defaults.params) {
+getDefaultPerfs = function(surrogates, defaults.params, train.inds = train_split()) {
   
   # Which split do we want to predict on? (train or test datasets)
   # Predict on each split
@@ -91,7 +94,7 @@ getDefaultPerfs = function(surrogates, defaults.params) {
     predict(x, newdata = defaults.params)$data$response
   })
   prd = as.data.frame(prd)
-  colnames(prd) = ifelse(colnames(prd) %in% train_split(), paste0(colnames(prd), "_train"),
+  colnames(prd) = ifelse(colnames(prd) %in% colnames(prd)[train.inds], paste0(colnames(prd), "_train"),
                          paste0(colnames(prd), "_test"))
   return(prd)
 }
@@ -119,7 +122,7 @@ randomSearch = function(surrogates, par.set, multiplier, points, seed = 199) {
   newdesign = newdesign[seq_len(multiplier * points), ]
 
   zs = sapply(surrogates, function(x) {predict(x, newdata = newdesign)$data$response})
-  zs = apply(zs, 2, min)
+  # zs = apply(zs, 2, min)
   names(zs) = names(surrogates)
   return(zs)
 }
