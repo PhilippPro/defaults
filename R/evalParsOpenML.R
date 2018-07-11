@@ -33,7 +33,7 @@ evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, n) {
   # Loop over Hold-Out Datasets
   res = lapply(seq_len(length(tasks)), function(i) {
     # Define inner Resampling Scheme
-    inner.rdesc = cv10
+    inner.rdesc = hout # cv10
     
     # Only take the first 'n' defaults
     defaults = defaults[seq_len(n), ]
@@ -43,22 +43,27 @@ evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, n) {
     lrn.def = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlDesign(design = defaults))
     res.def = evalParsOpenML(tasks[[i]], lrn.def)
     
-    # Search randomly (2x randomsearch)
-    lrn.rnd2 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 2 * nrow(defaults)))
-    res.rndx2 = evalParsOpenML(tasks[[i]], lrn.rnd2)
-    
-    # Search randomly (4x randomsearch)
-    lrn.rnd4 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 4 * nrow(defaults)))
-    res.rndx4 = evalParsOpenML(tasks[[i]], lrn.rnd4)
-    
-    # Search randomly (8x randomsearch)
-    lrn.rnd8 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 8 * nrow(defaults)))
-    res.rndx8 = evalParsOpenML(tasks[[i]], lrn.rnd8)
-    
-    # Return a data.frame
-    df = bind_rows("defaults" = res.def, "X2" = res.rndx2, "X4" = res.rndx4,
-      "X8" = res.rndx8, .id = "search.type")
-    df$n.defaults = n
+    if (TRUE) {
+      # Search randomly (2x randomsearch)
+      lrn.rnd2 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(same.resampling.instance = FALSE,
+        maxit = 2 * nrow(defaults)))
+      res.rndx2 = evalParsOpenML(tasks[[i]], lrn.rnd2)
+      
+      # Search randomly (4x randomsearch)
+      lrn.rnd4 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 4 * nrow(defaults)))
+      res.rndx4 = evalParsOpenML(tasks[[i]], lrn.rnd4)
+      
+      # Search randomly (8x randomsearch)
+      lrn.rnd8 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 8 * nrow(defaults)))
+      res.rndx8 = evalParsOpenML(tasks[[i]], lrn.rnd8)
+      
+      # Return a data.frame
+      df = bind_rows("defaults" = res.def, "X2" = res.rndx2, "X4" = res.rndx4,
+        "X8" = res.rndx8, .id = "search.type")
+      df$n.defaults = n
+    } else {
+      df = NULL
+    }
     return(df)
   })
   do.call("bind_rows", res)
