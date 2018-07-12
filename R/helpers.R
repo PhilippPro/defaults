@@ -156,9 +156,11 @@ getHashSeed = function(task, learner, init.seed = 111) {
   as.integer(seed %% (2^31-1))
 }
 
-
-
-
+makeProgressBarOpts = function() {
+  pb <- txtProgressBar(min=1, max=8000, style=3)
+  progress <- function(n) setTxtProgressBar(pb, n)
+  list(progress=progress)
+}
 
 
 

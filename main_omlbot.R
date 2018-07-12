@@ -45,12 +45,14 @@ for(i in c(2)) { # seq_along(learner.names)
   rin = makeResampleInstance(makeResampleDesc("CV", iters = 19), size = length(surrogates$surrogates))
   
   registerDoParallel(30)
-  
   # Iterate over ResampleInstance and its indices
   defs = foreach(it = seq_len(rin$desc$iters)) %dopar% {
     # Search for defaults
-    defs = searchDefaults(surrogates$surrogates[rin$train.inds[[it]]], surrogates$param.set,
-      n.defaults = 10, probs = 0.5)
+    defs = searchDefaults(
+      surrogates$surrogates[rin$train.inds[[it]]], # training surrogates (L-2-Out-CV)
+      surrogates$param.set, # parameter space to search through
+      n.defaults = 10, # Number of defaults we want to find
+      probs = 0.5) # Quantile we want to optimize
     return(defs)
   }
   
@@ -71,8 +73,7 @@ for(i in c(2)) { # seq_along(learner.names)
   stopImplicitCluster()
   
   saveRDS(list("oob.perf" = oml.res, "defaults" = defs),
-          stri_paste("defaultLOOCV/Q2",
-            gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
+          stri_paste("defaultLOOCV/Q2", gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
   gc()
 }
 
@@ -128,11 +129,26 @@ ggsave(pg, filename = paste0("defaultLOOCV/d", 2, unique(lst$oob.perf$learner.id
 #--------------------------------------------------------------------------------------------------
 # Evaluate found defaults on complete holdout datasets,
 # for which surrogates are not even available
+
+omlds = listOMLTasks(
+  task.type = "Supervised Classification",
+  estimation.procedure = "10-fold Crossvalidation",
+  number.of.instances = c(1, 10^5 - 1),
+  number.of.features = c(1, 1000),
+  number.of.missing.values = 0,
+  number.of.classes = 2) %>%
+  filter(!(data.id %in% read.csv("oml_data_task.txt", sep = " ")$data.id)) %>%
+  filter(status == "active") %>%
+  group_by(data.id) %>%
+  filter(row_number(data.id) == 1) %>%
+  arrange(number.of.features * sqrt(number.of.instances))
+
+# Tasks "1220" and "4135" are listed in the paper but not in the surrogates
 n.defs = c(2, 4, 6, 8, 10)
 hout.res = foreach(it = seq_len(rin$desc$iters)) %:%
   foreach(n = n.defs) %dopar% {
     evalDefaultsOpenML(
-      task.ids = c("1220", "4135"),
+      task.ids = c("1220", "4135", omlds$task.id[1:3]),
       lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
       defaults = lst$defaults,
       ps = surrogates$param.set,
@@ -153,8 +169,34 @@ oml.res %>%
 p2 = ggplot(oml.res, aes(x = search.type, y = auc.test.mean, color = task.id)) + 
   geom_boxplot() + geom_jitter() + facet_grid(cols = vars(n.defaults)) +
   ggtitle("Results for 19 different defaults / 19 iters of random search strategies")
-
-
 ggsave(p2, filename = paste0("defaultLOOCV/HOUT_", unique(lst$oob.perf$learner.id), "Q2", ".png"), scale = 2)
 
+p2f1 = ggplot(oml.res, aes(x = search.type, y = f1.test.mean, color = task.id)) + 
+  geom_boxplot() + geom_jitter() + facet_grid(cols = vars(n.defaults), rows = vars(task.id), scales = "free_y") +
+  ggtitle("Results for 19 different defaults / 19 iters of random search strategies")
+ggsave(p2f1, filename = paste0("defaultLOOCV/HOUT_f1", unique(lst$oob.perf$learner.id), "Q2", ".png"), scale = 2)
 
+p2acc = ggplot(oml.res, aes(x = search.type, y = acc.test.join, color = task.id)) + 
+  geom_boxplot() + geom_jitter() + facet_grid(cols = vars(n.defaults), rows = vars(task.id), scales = "free_y") +
+  ggtitle("Results for 19 different defaults / 19 iters of random search strategies")
+ggsave(p2acc, filename = paste0("defaultLOOCV/HOUT_acc", unique(lst$oob.perf$learner.id), "Q2", ".png"), scale = 2)
+
+
+#---------------------------------------------------------------------------------------------------
+# Eval defaults using tsne
+names(lst$defaults) = seq_len(length(lst$defaults))
+defdf = do.call("bind_rows", list(lst$defaults, .id = "iter"))
+library(Rtsne)
+rtsne = Rtsne(defdf[, -1], theta = 0.1)
+pdf = as.data.frame(rtsne$Y)
+pdf$n = as.factor(rep(1:10, 19))
+pdf$iter = as.factor(defdf$iter)
+ggplot(pdf, aes(x = V1, y = V2)) + geom_density2d() +facet_wrap(~n)
+
+
+library(ggbiplot)
+defdfpca <- prcomp(defdf[, -1] %>% filter(pdf$n %in% 1:4), scale. = TRUE)
+ggbiplot(defdfpca, choices = 1:2, obs.scale = 1, var.scale = 1,
+  groups = pdf$n[pdf$n %in% 1:4], ellipse = TRUE, circle = TRUE) +
+  scale_color_discrete(name = '') +
+  theme(legend.direction = 'horizontal', legend.position = 'top')
