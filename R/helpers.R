@@ -140,6 +140,22 @@ convertParamType = function(x, param_type) {
   return(x)
 }
 
+# Creates a seed from a task and a learner object and the current random state
+# Not sure if this will be used.
+getHashSeed = function(task, learner, init.seed = 111) {
+  
+  # Hash the task and the learner object
+  hash = digest::digest(c(task, learner, init.seed), algo = "murmur32")
+  seed.state = paste0(sum(abs(.Random.seed)), collapse = "")
+  x = paste0(hash, seed.state)
+  
+  # And transform this hash to a seed
+  tmp = setNames(c(0:9,0:25), c(0:9, letters))
+  xsplit = tmp[strsplit(gsub("[^0-9a-z]", "", as.character(x)), '')[[1]]]
+  seed = sum(rev(7^(seq(along=xsplit) - 1)) * xsplit)
+  as.integer(seed %% (2^31-1))
+}
+
 
 
 

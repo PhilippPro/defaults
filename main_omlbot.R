@@ -61,8 +61,9 @@ for(i in c(2)) { # seq_along(learner.names)
       evalDefaultsOpenML(
         task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
         lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
-        defaults = defs[[it]],
+        defaults = defs,
         ps = surrogates$param.set,
+        it = it,
         n = n)
     }
   oml.res = do.call("bind_rows", res)
@@ -124,7 +125,6 @@ ggsave(pg, filename = paste0("defaultLOOCV/d", 2, unique(lst$oob.perf$learner.id
 
 
 
-
 #--------------------------------------------------------------------------------------------------
 # Evaluate found defaults on complete holdout datasets,
 # for which surrogates are not even available
@@ -134,8 +134,9 @@ hout.res = foreach(it = seq_len(rin$desc$iters)) %:%
     evalDefaultsOpenML(
       task.ids = c("1220", "4135"),
       lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
-      defaults = lst$defaults[[it]],
+      defaults = lst$defaults,
       ps = surrogates$param.set,
+      it = it,
       n = n)
   }
 oml.res = do.call("bind_rows", hout.res)
@@ -151,7 +152,7 @@ oml.res %>%
 
 p2 = ggplot(oml.res, aes(x = search.type, y = auc.test.mean, color = task.id)) + 
   geom_boxplot() + geom_jitter() + facet_grid(cols = vars(n.defaults)) +
-  ggtitle("Results for 19 different defaults / random search strategies")
+  ggtitle("Results for 19 different defaults / 19 iters of random search strategies")
 
 
 ggsave(p2, filename = paste0("defaultLOOCV/HOUT_", unique(lst$oob.perf$learner.id), "Q2", ".png"), scale = 2)
