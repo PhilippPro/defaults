@@ -4,6 +4,7 @@
 # @param pars Single param Configuration
 evalParsOpenML = function(task, lrn) {
   
+  browser()
   # Run Task
   run = runTaskMlr2(task, lrn, measures = list(auc, f1))
   
@@ -69,13 +70,23 @@ evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n) {
 }
 
 # Convert factors to character, eventually filter invalid params
-fixDefaultsForWrapper = function(pars, lrn) {
+fixDefaultsForWrapper = function(pars, lrn, check.feasible = TRUE) {
+
   # Convert factor params to character
-  pars = sapply(pars, function(x) {if (is.factor(x)) x = as.character(x); x})
+  pars = data.frame(lapply(pars, function(x) {if (is.factor(x)) x = as.character(x); x}), stringsAsFactors = FALSE)
+  
   # Filter invalid params
-  # ps = getParamSet(lrn)
-  # pars = pars[sapply(names(pars), function(x) {isFeasible(ps$pars[[x]], pars[[x]])})]
-  return(data.frame(pars))
+  if (check.feasible) {
+    ps = getParamSet(lrn)
+    for (nm in names(pars)) {
+      for(n in seq_len(nrow(pars))) {
+        if(!isFeasible(ps$pars[[nm]], pars[n, nm]))
+          pars[n, nm] = NA
+      }
+    }
+  }
+
+  return(pars)
 }
 
 

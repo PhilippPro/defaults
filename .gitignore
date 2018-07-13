@@ -8,4 +8,5 @@
 *.zip
 *.Rbuildignore
 *.arff
+*_gc.json
 

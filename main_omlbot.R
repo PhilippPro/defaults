@@ -1,8 +1,9 @@
-library(devtools)
-library(stringi)
-library(focussearch)
-library(doParallel)
-library(foreach)
+library(devtools)   # load_all()
+library(stringi)    # string manipulation
+library(focussearch)# Search the surrogates
+library(doParallel) # Parallelization
+library(foreach)    # Parallelization
+library(notifier)   # Optional, sends notification when long-runtime jobs finish
 load_all()
 
 # Get randomBot Data from the figshare repository-------------------------
@@ -57,9 +58,9 @@ for(i in c(2)) { # seq_along(learner.names)
   }
   
   # Evaluate found defaults on OpenML
-  n.defs = c(2, 4, 6, 8, 10)
-  res = foreach(it = seq_len(rin$desc$iters)) %:%
-    foreach(n = n.defs) %dopar% {
+  n.defs = c(2, 4, 6, 8, 10)[1]
+  res = foreach(it = seq_len(rin$desc$iters - 18)) %:%
+    foreach(n = n.defs) %do% {
       evalDefaultsOpenML(
         task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
         lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
@@ -75,6 +76,7 @@ for(i in c(2)) { # seq_along(learner.names)
   saveRDS(list("oob.perf" = oml.res, "defaults" = defs),
           stri_paste("defaultLOOCV/Q2", gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
   gc()
+  notify(title = "Job finished", msg = "Time to return to work!")
 }
 
 
@@ -87,8 +89,8 @@ library(ggpubr)
 library(patchwork)
 
 # Boxplot of the different methods
-p <- ggboxplot(
-  lst$oob.perf, x = "search.type", y = "auc.test.mean", color = "search.type",
+p <- ggboxplot(lst$oob.perf,
+  x = "search.type", y = "auc.test.mean", color = "search.type",
   palette =c("#00AFBB", "#E7B800", "#FC4E07", "#FC88BB"),
   add = "jitter") +
   ggtitle("Performance across all datasets")
@@ -159,12 +161,7 @@ oml.res = do.call("bind_rows", hout.res)
 saveRDS(oml.res, "defaultLOOCV/HOUT_Q2_cubist_classif.rpart_auc_zscale_.RDS")
 
 
-oml.res %>%
-  group_by(search.type, task.id, learner.id, n.defaults) %>%
-  summarize(auc = mean(auc.test.mean),
-    sd_auc = sd(auc.test.mean),
-    f1 = mean(f1.test.mean)) %>%
-  arrange(n.defaults)
+
 
 p2 = ggplot(oml.res, aes(x = search.type, y = auc.test.mean, color = task.id)) + 
   geom_boxplot() + geom_jitter() + facet_grid(cols = vars(n.defaults)) +
