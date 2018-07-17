@@ -2,11 +2,16 @@
 # @param task OpenML Task Id | OMLTask
 # @param lrn Learner
 # @param pars Single param Configuration
-evalParsOpenML = function(task, lrn) {
-  
-  browser()
-  # Run Task
-  run = runTaskMlr2(task, lrn, measures = list(auc, f1))
+evalParsOpenML = function(task, lrn, ps, fun = runTaskMlr2) {
+
+  # Run Task in a separate process
+  tryCatch(
+    run = callr::r(
+      function(task, lrn, measures, fun) {do.call(fun, list(task, lrn, measures))},
+      list(task = task, lrn = lrn, measures =  list(auc, f1), fun = fun),
+      error = "stack", show = TRUE),
+    error = function(e) print(e$stack)
+  )
   
   # FIXME: Eventually upload the run
   perf = getBMRAggrPerformances(run$bmr, as.df = TRUE)
@@ -38,24 +43,31 @@ evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n) {
     # Only take the first 'n' defaults
     defaults = defaults[[it]][seq_len(n), ]
     
+    # Get Paramset on original scale, drop unused params 
+    # and make sure they are in the same order as the design
+    lrn.ps = getParamSet(lrn)
+    lrn.ps$pars = lrn.ps$pars[colnames(defaults)]
     # Search over the n defaults
-    defaults = fixDefaultsForWrapper(defaults, lrn)
-    lrn.def = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlDesign(design = defaults))
-    res.def = evalParsOpenML(tasks[[i]], lrn.def)
+    defaults = fixDefaultsForWrapper(defaults, lrn, ps = lrn.ps)
+    
+    lrn.def = makeTuneWrapper(lrn, inner.rdesc, auc, 
+      par.set = lrn.ps,
+      makeTuneControlDesign(design = defaults))
+    res.def = evalParsOpenML(tasks[[i]], lrn.def, ps, fun = runTaskMlr2)
     
     if (TRUE) {
       # Search randomly (2x randomsearch)
       lrn.rnd2 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(same.resampling.instance = FALSE,
         maxit = 2 * nrow(defaults)))
-      res.rndx2 = evalParsOpenML(tasks[[i]], lrn.rnd2)
+      res.rndx2 = evalParsOpenML(tasks[[i]], lrn.rnd2, ps)
       
       # Search randomly (4x randomsearch)
       lrn.rnd4 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 4 * nrow(defaults)))
-      res.rndx4 = evalParsOpenML(tasks[[i]], lrn.rnd4)
+      res.rndx4 = evalParsOpenML(tasks[[i]], lrn.rnd4, ps)
       
       # Search randomly (8x randomsearch)
       lrn.rnd8 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 8 * nrow(defaults)))
-      res.rndx8 = evalParsOpenML(tasks[[i]], lrn.rnd8)
+      res.rndx8 = evalParsOpenML(tasks[[i]], lrn.rnd8, ps)
       
       # Return a data.frame
       df = bind_rows("defaults" = res.def, "X2" = res.rndx2, "X4" = res.rndx4,
@@ -70,7 +82,7 @@ evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n) {
 }
 
 # Convert factors to character, eventually filter invalid params
-fixDefaultsForWrapper = function(pars, lrn, check.feasible = TRUE) {
+fixDefaultsForWrapper = function(pars, lrn, ps, check.feasible = TRUE) {
 
   # Convert factor params to character
   pars = data.frame(lapply(pars, function(x) {if (is.factor(x)) x = as.character(x); x}), stringsAsFactors = FALSE)
@@ -91,18 +103,17 @@ fixDefaultsForWrapper = function(pars, lrn, check.feasible = TRUE) {
 
 
 # Copy of runTaskMlr from Package OpenML without annoying set.seed behaviour.
-runTaskMlr2 = function(task, learner, measures = NULL, verbosity = NULL,
-  scimark.vector = NULL, models = TRUE, ...) {
-  assert(checkString(learner), checkClass(learner, "Learner"))
+runTaskMlr2 = function(task, learner, measures = NULL,  scimark.vector = NULL, models = TRUE, ...) {
+  checkmate::assert(checkmate::checkString(learner), checkmate::checkClass(learner, "Learner"))
   if (is.character(learner))
     learner = mlr::makeLearner(learner)
-  assertClass(task, "OMLTask")
-  assertChoice(task$task.type, c("Supervised Classification", "Supervised Regression"))
+  checkmate::assertClass(task, "OMLTask")
+  checkmate::assertChoice(task$task.type, c("Supervised Classification", "Supervised Regression"))
   if (!is.null(scimark.vector))
-    assertNumeric(scimark.vector, lower = 0, len = 6, finite = TRUE, any.missing = FALSE, all.missing = FALSE)
+    checkmate::assertNumeric(scimark.vector, lower = 0, len = 6, finite = TRUE, any.missing = FALSE, all.missing = FALSE)
   
   # create parameter list
-  parameter.setting = makeOMLRunParList(learner)
+  parameter.setting = OpenML::makeOMLRunParList(learner)
   
   # set default evaluation measure for classification and regression
   if (task$input$evaluation.measures == "") {
@@ -112,45 +123,40 @@ runTaskMlr2 = function(task, learner, measures = NULL, verbosity = NULL,
       task$input$evaluation.measures = "root_mean_squared_error"
   }
   
-  # get mlr show.info from verbosity level
-  if (is.null(verbosity))
-    verbosity = getOMLConfig()$verbosity
-  show.info = (verbosity > 0L)
-  
   # create Flow
-  flow = convertMlrLearnerToOMLFlow(learner)
+  flow = OpenML::convertMlrLearnerToOMLFlow(learner)
   
   # Create mlr task with estimation procedure and evaluation measure
-  z = convertOMLTaskToMlr(task, measures = measures, verbosity = verbosity, ...)
+  z = OpenML::convertOMLTaskToMlr(task, measures = measures, ...)
   
   # Create OMLRun
   bmr = mlr::benchmark(learner, z$mlr.task, z$mlr.rin, measures = z$mlr.measures,
-    models = models, show.info = show.info)
+    models = models)
   res = bmr$results[[1]][[1]]
   
   # add error message
   tr.err = unique(res$err.msgs$train)
   pr.err = unique(res$err.msgs$predict)
   if (any(!is.na(tr.err))) {
-    tr.msg = paste0("Error in training the model: \n ", collapse(tr.err, sep = "\n "))
+    tr.msg = paste0("Error in training the model: \n ", dplyr::collapse(tr.err, sep = "\n "))
   } else {
     tr.msg = NULL
   }
   if (any(!is.na(pr.err))) {
-    pr.msg = paste0("Error in making predictions: \n ", collapse(pr.err, sep = "\n "))
+    pr.msg = paste0("Error in making predictions: \n ", dplyr::collapse(pr.err, sep = "\n "))
   } else {
     pr.msg = NULL
   }
   msg = paste0(tr.msg, pr.msg)
   
   # create run
-  run = makeOMLRun(task.id = task$task.id,
+  run = OpenML::makeOMLRun(task.id = task$task.id,
     error.message = ifelse(length(msg) == 0, NA_character_, msg))
   run$predictions = OpenML:::reformatPredictions(res$pred$data, task)
   
-
+  
   if (!is.null(scimark.vector)) {
     run$scimark.vector = scimark.vector
   }
-  makeS3Obj("OMLMlrRun", run = run, bmr = bmr, flow = flow)
+  BBmisc::makeS3Obj("OMLMlrRun", run = run, bmr = bmr, flow = flow)
 }

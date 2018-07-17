@@ -2,6 +2,7 @@ library(devtools)   # load_all()
 library(stringi)    # string manipulation
 library(focussearch)# Search the surrogates
 library(doParallel) # Parallelization
+library(doMC)       # Parallelization
 library(foreach)    # Parallelization
 library(notifier)   # Optional, sends notification when long-runtime jobs finish
 load_all()
@@ -21,7 +22,7 @@ learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
 source("https://raw.githubusercontent.com/pfistfl/mlr-extralearner/master/R/RLearner_regr_fixcubist.R")
 surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 20)
 
-registerDoParallel(19)
+registerDoMC(19)
 trainSaveSurrogates(surrogate.mlr.lrn, lrn.par.sets, learner.names)
 stopImplicitCluster()
 
@@ -43,9 +44,9 @@ for(i in c(2)) { # seq_along(learner.names)
   
   # Search for defaults
   set.seed(199 + i)
-  rin = makeResampleInstance(makeResampleDesc("CV", iters = 19), size = length(surrogates$surrogates))
+  rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
   
-  registerDoParallel(30)
+  registerDoMC(19)
   # Iterate over ResampleInstance and its indices
   defs = foreach(it = seq_len(rin$desc$iters)) %dopar% {
     # Search for defaults
@@ -56,11 +57,14 @@ for(i in c(2)) { # seq_along(learner.names)
       probs = 0.5) # Quantile we want to optimize
     return(defs)
   }
+  # Save found defaults as RDS
+  saveRDS(list("defaults" = defs),
+    stri_paste("defaultLOOCV/Q2_defaults", gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
   
   # Evaluate found defaults on OpenML
-  n.defs = c(2, 4, 6, 8, 10)[1]
-  res = foreach(it = seq_len(rin$desc$iters - 18)) %:%
-    foreach(n = n.defs) %do% {
+  n.defs = c(2, 4, 6, 8, 10)
+  res = foreach(it = seq_len(rin$desc$iters)) %:%
+    foreach(n = n.defs) %dopar% {
       evalDefaultsOpenML(
         task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
         lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
@@ -74,16 +78,16 @@ for(i in c(2)) { # seq_along(learner.names)
   stopImplicitCluster()
   
   saveRDS(list("oob.perf" = oml.res, "defaults" = defs),
-          stri_paste("defaultLOOCV/Q2", gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
+          stri_paste("defaultLOOCV/Q2_oobperf", gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
   gc()
-  notify(title = "Job finished", msg = "Time to return to work!")
+  notify(title = "Job finished", msg = "Time to return to woRk!")
 }
 
 
 
 # Create Plots comparing to random search ------------------------------------------------------------
 # Read in found defaults and surrogates
-lst = readRDS("defaultLOOCV/Q2_cubist_classif.rpart_auc_zscale_.RDS")
+lst = readRDS("defaultLOOCV/Q2_cubist_classif.svm_auc_zscale_.RDS")
 
 library(ggpubr)
 library(patchwork)
