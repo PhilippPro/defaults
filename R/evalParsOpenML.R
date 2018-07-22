@@ -2,16 +2,17 @@
 # @param task OpenML Task Id | OMLTask
 # @param lrn Learner
 # @param pars Single param Configuration
-evalParsOpenML = function(task, lrn, ps, fun = runTaskMlr2) {
-
+evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
+  
   # Run Task in a separate process
-  tryCatch(
-    run = callr::r(
-      function(task, lrn, measures, fun) {do.call(fun, list(task, lrn, measures))},
-      list(task = task, lrn = lrn, measures =  list(auc, f1), fun = fun),
-      error = "stack", show = TRUE),
-    error = function(e) print(e$stack)
-  )
+  # tryCatch(
+  #   run = callr::r(
+  #     function(task, lrn, measures, fun) {do.call(fun, list(task, lrn, measures))},
+  #     list(task = task, lrn = lrn, measures =  list(auc, f1), fun = fun),
+  #     error = "stack", show = TRUE),
+  #   error = function(e) print(e$stack)
+  # )
+  run = runTaskMlr2(task, lrn, measures = list(auc, f1))
   
   # FIXME: Eventually upload the run
   perf = getBMRAggrPerformances(run$bmr, as.df = TRUE)
@@ -25,8 +26,10 @@ evalParsOpenML = function(task, lrn, ps, fun = runTaskMlr2) {
 # @param task.ids  Vector of OpenML Task Ids
 # @param lrn Learner
 # @param defaults Set of default parameters
-evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n) {
+evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
   
+  filepath = stringBuilder("defaultLOOCV/save/", stri_paste(it, n, "perf", sep = "_"), learner.names[i])
+
   # The names of the surrogates are "OpenML Data Id's". We need "OpenML Task Id's.
   data_task_match = read.csv("oml_data_task.txt", sep = " ")
   if (is.character(task.ids)) task.ids = as.numeric(task.ids)
@@ -41,33 +44,38 @@ evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n) {
     inner.rdesc = hout # cv10
     
     # Only take the first 'n' defaults
+    if (lrn$id == "classif.svm")
+      defaults$type = "C-classification"
+    # Only use one thread for xbg
+    if (lrn$id == "classif.xgboost")
+      lrn = setHyperPars(lrn, "nthread" = 1L)
+    
     defaults = defaults[[it]][seq_len(n), ]
     
     # Get Paramset on original scale, drop unused params 
     # and make sure they are in the same order as the design
-    lrn.ps = getParamSet(lrn)
-    lrn.ps$pars = lrn.ps$pars[colnames(defaults)]
+    lrn.ps = fixParamSetForDesign(defaults, lrn)
     # Search over the n defaults
-    defaults = fixDefaultsForWrapper(defaults, lrn, ps = lrn.ps)
+    defaults = fixDefaultsForWrapper(defaults, lrn, lrn.ps)
     
-    lrn.def = makeTuneWrapper(lrn, inner.rdesc, auc, 
+    lrn.def = makeTuneWrapper(lrn, inner.rdesc, auc,
       par.set = lrn.ps,
       makeTuneControlDesign(design = defaults))
-    res.def = evalParsOpenML(tasks[[i]], lrn.def, ps, fun = runTaskMlr2)
+    res.def = evalParsOpenML(tasks[[i]], lrn.def)
     
     if (TRUE) {
       # Search randomly (2x randomsearch)
       lrn.rnd2 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(same.resampling.instance = FALSE,
         maxit = 2 * nrow(defaults)))
-      res.rndx2 = evalParsOpenML(tasks[[i]], lrn.rnd2, ps)
+      res.rndx2 = evalParsOpenML(tasks[[i]], lrn.rnd2)
       
       # Search randomly (4x randomsearch)
       lrn.rnd4 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 4 * nrow(defaults)))
-      res.rndx4 = evalParsOpenML(tasks[[i]], lrn.rnd4, ps)
+      res.rndx4 = evalParsOpenML(tasks[[i]], lrn.rnd4)
       
       # Search randomly (8x randomsearch)
       lrn.rnd8 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 8 * nrow(defaults)))
-      res.rndx8 = evalParsOpenML(tasks[[i]], lrn.rnd8, ps)
+      res.rndx8 = evalParsOpenML(tasks[[i]], lrn.rnd8)
       
       # Return a data.frame
       df = bind_rows("defaults" = res.def, "X2" = res.rndx2, "X4" = res.rndx4,
@@ -78,12 +86,14 @@ evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n) {
     }
     return(df)
   })
-  do.call("bind_rows", res)
+  df = do.call("bind_rows", res)
+  saveRDS(df, stringBuilder("defaultLOOCV/save/", stri_paste(it, n, sep = "_"), lrn$id))
+  return(df)
 }
 
 # Convert factors to character, eventually filter invalid params
 fixDefaultsForWrapper = function(pars, lrn, ps, check.feasible = TRUE) {
-
+  
   # Convert factor params to character
   pars = data.frame(lapply(pars, function(x) {if (is.factor(x)) x = as.character(x); x}), stringsAsFactors = FALSE)
   
@@ -92,15 +102,25 @@ fixDefaultsForWrapper = function(pars, lrn, ps, check.feasible = TRUE) {
     ps = getParamSet(lrn)
     for (nm in names(pars)) {
       for(n in seq_len(nrow(pars))) {
-        if(!isFeasible(ps$pars[[nm]], pars[n, nm]))
+        if(!isFeasible(ps$pars[[nm]], pars[n, nm], use.defaults = TRUE, filter = TRUE))
           pars[n, nm] = NA
       }
     }
   }
-
   return(pars)
 }
 
+fixParamSetForDesign = function(defaults, lrn) {
+  # Get ParamSet and reduce to relevant ones.
+  lrn.ps = getParamSet(lrn)
+  lrn.ps$pars = lrn.ps$pars[colnames(defaults)]
+  # Add NA for hierarchical params
+  lrn.ps$pars = lapply(lrn.ps$pars, function(x) {
+    x$special.vals = list(NA)
+    return(x)
+  })
+  return(lrn.ps)
+}
 
 # Copy of runTaskMlr from Package OpenML without annoying set.seed behaviour.
 runTaskMlr2 = function(task, learner, measures = NULL,  scimark.vector = NULL, models = TRUE, ...) {

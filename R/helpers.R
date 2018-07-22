@@ -140,6 +140,16 @@ convertParamType = function(x, param_type) {
   return(x)
 }
 
+
+stringBuilder = function(folder, what, learner.name) {
+  files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist_classif")]
+  stri_paste(folder, "/", what, gsub("regr.", "", files[grep(stri_sub(learner.name, from = 5), x = files)]))
+}
+
+
+
+
+# -------------------------------------------------------------------------------------------------
 # Creates a seed from a task and a learner object and the current random state
 # Not sure if this will be used.
 getHashSeed = function(task, learner, init.seed = 111) {

@@ -38,96 +38,100 @@ stopImplicitCluster()
 files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist_classif")]
 for(i in c(2)) { # seq_along(learner.names)
   catf("Learner: %s", learner.names[i])
-
+  set.seed(199 + i)
+  
   # Read surrogates from Hard Drive
   surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
-  
-  # Search for defaults
-  set.seed(199 + i)
+  # Create resampling train/test splits
   rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
   
-  registerDoMC(19)
+  registerDoMC(25)
+# ------------------------------------------------------------------------------------------------
+  # Defaults
+  defs.file = stringBuilder("defaultLOOCV", "Q2_defaults", learner.names[i])
   # Iterate over ResampleInstance and its indices
   defs = foreach(it = seq_len(rin$desc$iters)) %dopar% {
+    set.seed(199 + i)
     # Search for defaults
     defs = searchDefaults(
-      surrogates$surrogates[rin$train.inds[[it]]], # training surrogates (L-2-Out-CV)
+      surrogates$surrogates[rin$train.inds[[it]]], # training surrogates (L-1-Out-CV)
       surrogates$param.set, # parameter space to search through
       n.defaults = 10, # Number of defaults we want to find
       probs = 0.5) # Quantile we want to optimize
     return(defs)
   }
-  # Save found defaults as RDS
-  saveRDS(list("defaults" = defs),
-    stri_paste("defaultLOOCV/Q2_defaults", gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
   
-  # Evaluate found defaults on OpenML
+  # Save found defaults as RDS
+  saveRDS(list("defaults" = defs), defs.file)
+  defs = readRDS(defs.file)
+  
+  #-------------------------------------------------------------------------------------------------
+  # Evaluate found defaults on OOB-Tasks on OpenML
   n.defs = c(2, 4, 6, 8, 10)
   res = foreach(it = seq_len(rin$desc$iters)) %:%
     foreach(n = n.defs) %dopar% {
       evalDefaultsOpenML(
         task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
         lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
-        defaults = defs,
+        defaults = defs$defaults,
         ps = surrogates$param.set,
         it = it,
         n = n)
-    }
+      }
   oml.res = do.call("bind_rows", res)
   
   stopImplicitCluster()
   
-  saveRDS(list("oob.perf" = oml.res, "defaults" = defs),
-          stri_paste("defaultLOOCV/Q2_oobperf", gsub("regr.", "", files[grep(stri_sub(learner.names[i], from = 5), x = files)])))
-  gc()
-  notify(title = "Job finished", msg = "Time to return to woRk!")
+  saveRDS(list("oob.perf" = oml.res), stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i]))
+  
+  gc(); notify(title = "Job finished", msg = "Time to return to woRk!")
 }
-
-
 
 # Create Plots comparing to random search ------------------------------------------------------------
 # Read in found defaults and surrogates
-lst = readRDS("defaultLOOCV/Q2_cubist_classif.svm_auc_zscale_.RDS")
+lst = readRDS(stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i]))
 
 library(ggpubr)
 library(patchwork)
 
-# Boxplot of the different methods
-p <- ggboxplot(lst$oob.perf,
-  x = "search.type", y = "auc.test.mean", color = "search.type",
-  palette =c("#00AFBB", "#E7B800", "#FC4E07", "#FC88BB"),
-  add = "jitter") +
-  ggtitle("Performance across all datasets")
-
-# Boxplot comparing to default search
-gdata = lst$oob.perf %>% 
-  left_join(lst$oob.perf %>%
-    filter(search.type == "defaults") %>%
-    mutate(
-      auc.def = auc.test.mean,
-      acc.def = acc.test.join,
-      f1.def = f1.test.mean
-      ),
-    by = c("task.id", "learner.id", "n.defaults")) %>%
-  mutate(
-    delta_auc = auc.test.mean.x - auc.def,
-    delta_acc = acc.test.join.x - acc.def,
-    delta_f1 = f1.test.mean.x - f1.def
-    ) %>%
-  filter(search.type.x != "defaults")
-
-# Boxplot Differences
-g = ggboxplot(gdata, x = "search.type.x", y = "delta_auc", color = "search.type.x",
-    palette =c("#E7B800", "#FC4E07", "#FC88BB"),
+for (measure in c("auc.test.mean", "acc.test.join", "f1.test.mean")) {
+  # Boxplot of the different methods
+  p <- ggboxplot(lst$oob.perf,
+    x = "search.type", y = measure, color = "search.type",
+    palette =c("#00AFBB", "#E7B800", "#FC4E07", "#FC88BB"),
     add = "jitter") +
-  geom_abline(intercept = 0, slope = 0) +
-  coord_cartesian(ylim = c(-0.4, 0.05)) +
-  ggtitle("Performance difference to defaults")
-
-# Create combined plot
-pg = (p + facet_grid(cols = vars(n.defaults))) / (g + facet_grid(cols = vars(n.defaults)))
-
-ggsave(pg, filename = paste0("defaultLOOCV/d", 2, unique(lst$oob.perf$learner.id), "Q2", ".png"), scale = 2)
+    ggtitle("Performance across all datasets")
+  
+  # Boxplot comparing to default search
+  gdata = lst$oob.perf %>% 
+    left_join(lst$oob.perf %>%
+      filter(search.type == "defaults") %>%
+      mutate(
+        auc.def = auc.test.mean,
+        acc.def = acc.test.join,
+        f1.def = f1.test.mean
+        ),
+      by = c("task.id", "learner.id", "n.defaults")) %>%
+    mutate(
+      delta_auc = auc.test.mean.x - auc.def,
+      delta_acc = acc.test.join.x - acc.def,
+      delta_f1 = f1.test.mean.x - f1.def
+      ) %>%
+    filter(search.type.x != "defaults")
+  
+  delta = switch(measure, "auc.test.mean" = "delta_auc", "acc.test.join" = "delta_acc", "f1.test.mean" = "delta_f1")
+  # Boxplot Differences
+  g = ggboxplot(gdata, x = "search.type.x", y = delta, color = "search.type.x",
+      palette =c("#E7B800", "#FC4E07", "#FC88BB"),
+      add = "jitter") +
+    geom_abline(intercept = 0, slope = 0) +
+    coord_cartesian(ylim = c(-0.4, 0.05)) +
+    ggtitle(stri_paste("Performance difference to defaults for ", measure))
+  
+  # Create combined plot
+  pg = (p + facet_grid(cols = vars(n.defaults))) / (g + facet_grid(cols = vars(n.defaults)))
+  ggsave(pg, filename = paste0("defaultLOOCV/d", measure, unique(lst$oob.perf$learner.id), "Q2", ".png"), scale = 3)
+}
 
 
 
@@ -150,13 +154,13 @@ omlds = listOMLTasks(
   arrange(number.of.features * sqrt(number.of.instances))
 
 # Tasks "1220" and "4135" are listed in the paper but not in the surrogates
-n.defs = c(2, 4, 6, 8, 10)
+n.defs = c(2, 4, 6, 8, 10)[1:3]
 hout.res = foreach(it = seq_len(rin$desc$iters)) %:%
   foreach(n = n.defs) %dopar% {
     evalDefaultsOpenML(
-      task.ids = c("1220", "4135", omlds$task.id[1:3]),
+      task.ids = c("1220", "4135"),
       lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
-      defaults = lst$defaults,
+      defaults = defs$defaults,
       ps = surrogates$param.set,
       it = it,
       n = n)
@@ -192,12 +196,17 @@ rtsne = Rtsne(defdf[, -1], theta = 0.1)
 pdf = as.data.frame(rtsne$Y)
 pdf$n = as.factor(rep(1:10, 19))
 pdf$iter = as.factor(defdf$iter)
-ggplot(pdf, aes(x = V1, y = V2)) + geom_density2d() +facet_wrap(~n)
-
+ggplot(pdf, aes(x = V1, y = V2)) + geom_density2d() + facet_wrap(~n)
+ggplot(pdf, aes(x = V1, y = V2, color = iter)) + geom_point() + facet_wrap(~n)
+ggplot(pdf, aes(x = V1, y = V2, color = n)) + geom_point() + facet_wrap(~iter)
 
 library(ggbiplot)
 defdfpca <- prcomp(defdf[, -1] %>% filter(pdf$n %in% 1:4), scale. = TRUE)
+
 ggbiplot(defdfpca, choices = 1:2, obs.scale = 1, var.scale = 1,
   groups = pdf$n[pdf$n %in% 1:4], ellipse = TRUE, circle = TRUE) +
   scale_color_discrete(name = '') +
   theme(legend.direction = 'horizontal', legend.position = 'top')
+
+defdf$n = as.factor(rep(1:10, 19))
+ggplot(defdf %>% filter(n %in% 1:4, iter %in% 1:5), aes(x = cp, y = minsplit, color = n, shape = iter)) + geom_point(size = 4)

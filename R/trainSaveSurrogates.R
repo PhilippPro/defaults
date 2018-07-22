@@ -12,6 +12,7 @@ trainSaveSurrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, me
   foreach(k = seq_along(learner.names)[6]) %do% {
     sprintf("Learner %i: %s", k, learner.names[k])
     set.seed(199)
+    
     # Train the surrogate models
     surrogates = makeSurrogateModels(measure = measure, learner.name = learner.names[k],
                                      data.ids = data.ids, tbl.results, tbl.metaFeatures, tbl.hypPars,
@@ -132,8 +133,9 @@ makeBotTable = function(measure, learner.name, tbl.results, tbl.metaFeatures, tb
     tbl.hypPars.learner[, params[i]] = convertParamType(tbl.hypPars.learner[, params[i]], param_types[i])
   
   measure.name = measure$id
+
   bot.table = tbl.results %>%
-    rename(acc = accuracy) %>%
+    dplyr::rename(acc = accuracy) %>%
     select(one_of("setup", measure.name, "data_id", "task_id")) %>%
     inner_join(tbl.hypPars.learner, by = "setup") %>%
     select(., -setup)

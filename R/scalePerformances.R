@@ -22,13 +22,13 @@ scalePerformances = function(table, measure, scaling = "none") {
 
 # Logit Transform  before subtracting means / dividing by standard deviation.
 logit = function(x) {
-  x %>% mutate(measure.name = scale(log(measure.value / (1 - measure.value))))
+  x %>% group_by(data_id) %>% mutate(measure.name = scale(log(measure.value / (1 - measure.value))))
 }
 
 
 # Normalize values by subtracting mean and dividing by standard deviation, so a z-score.
 zNormalize = function(x) {
-  x %>% mutate(measure.value = scale(measure.value))
+  x %>% group_by(data_id) %>% mutate(measure.value = scale(measure.value))
 }
 
 
@@ -36,6 +36,7 @@ zNormalize = function(x) {
 # across the whole parameter space.
 zeroOneScale = function(x) {
   # FIXME: 1 should be majorityclass, not the minimum
-  x %>% group_by(data.id) %>%
+  x %>%
+    group_by(data_id) %>%
     mutate(measure.name = 1 - (measure.value - min(measure.value) / (max(measure.value) - min(measure.value))))
 }
