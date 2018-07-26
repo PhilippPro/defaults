@@ -13,6 +13,7 @@ Depends:
   OpenML (>= 1.2),
   batchtools (>= 0.9.0),
   BBmisc (>= 1.10),
+  dummies,
   dplyr (>= 0.5.0),
   checkmate (>= 1.8.0),
   tidyr (>= 0.6.1),

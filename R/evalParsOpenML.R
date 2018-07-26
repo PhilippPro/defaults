@@ -28,66 +28,85 @@ evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
 # @param defaults Set of default parameters
 evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
   
-  filepath = stringBuilder("defaultLOOCV/save/", stri_paste(it, n, "perf", sep = "_"), learner.names[i])
+  filepath = stringBuilder("defaultLOOCV/save", stri_paste(it, n, "perf", sep = "_"), lrn$id)
 
-  # The names of the surrogates are "OpenML Data Id's". We need "OpenML Task Id's.
-  data_task_match = read.csv("oml_data_task.txt", sep = " ")
-  if (is.character(task.ids)) task.ids = as.numeric(task.ids)
-  tasks = foreach(task.id = task.ids) %do% getOMLTask(data_task_match[data_task_match$data.id == task.id, "task.id"])
-  
-  # In an Wrapper that selects the best default:
-  lrn = setPredictType(lrn, "prob")
-  
-  # Loop over Hold-Out Datasets
-  res = lapply(seq_len(length(tasks)), function(i) {
-    # Define inner Resampling Scheme
-    inner.rdesc = hout # cv10
+  if (!file.exists(filepath) | overwrite) {
+    # The names of the surrogates are "OpenML Data Id's". We need "OpenML Task Id's.
+    data_task_match = read.csv("oml_data_task.txt", sep = " ")
+    if (is.character(task.ids)) task.ids = as.numeric(task.ids)
+    tasks = foreach(task.id = task.ids) %do% getOMLTask(data_task_match[data_task_match$data.id == task.id, "task.id"])
     
-    # Only take the first 'n' defaults
-    if (lrn$id == "classif.svm")
-      defaults$type = "C-classification"
-    # Only use one thread for xbg
-    if (lrn$id == "classif.xgboost")
-      lrn = setHyperPars(lrn, "nthread" = 1L)
+    # In an Wrapper that selects the best default:
+    lrn = setPredictType(lrn, "prob")
     
-    defaults = defaults[[it]][seq_len(n), ]
-    
-    # Get Paramset on original scale, drop unused params 
-    # and make sure they are in the same order as the design
-    lrn.ps = fixParamSetForDesign(defaults, lrn)
-    # Search over the n defaults
-    defaults = fixDefaultsForWrapper(defaults, lrn, lrn.ps)
-    
-    lrn.def = makeTuneWrapper(lrn, inner.rdesc, auc,
-      par.set = lrn.ps,
-      makeTuneControlDesign(design = defaults))
-    res.def = evalParsOpenML(tasks[[i]], lrn.def)
-    
-    if (TRUE) {
-      # Search randomly (2x randomsearch)
-      lrn.rnd2 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(same.resampling.instance = FALSE,
-        maxit = 2 * nrow(defaults)))
-      res.rndx2 = evalParsOpenML(tasks[[i]], lrn.rnd2)
+    # Loop over Hold-Out Datasets
+    res = lapply(seq_len(length(tasks)), function(i) {
       
-      # Search randomly (4x randomsearch)
-      lrn.rnd4 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 4 * nrow(defaults)))
-      res.rndx4 = evalParsOpenML(tasks[[i]], lrn.rnd4)
+      # Define inner Resampling Scheme
+      inner.rdesc = hout # cv10
+      task = tasks[[i]]
+      defaults = defaults[[it]][seq_len(n), ]
+    
+      # Only take the first 'n' defaults
+      if (getLearnerPackages(lrn) == "e1071") {
+        lrn = setHyperPars(lrn, "type" = "C-classification")
+        # ps = c(ps, makeDiscreteLearnerParam("type", values = "C-classification"))
+        defaults$type = "C-classification"
+      }
+      # Only use one thread for xbg
+      if (getLearnerPackages(lrn) == "xgboost") {
+        lrn = setHyperPars(lrn, "nthread" = 1L)
+        default$nthread = 1L
+      }
       
-      # Search randomly (8x randomsearch)
-      lrn.rnd8 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 8 * nrow(defaults)))
-      res.rndx8 = evalParsOpenML(tasks[[i]], lrn.rnd8)
       
-      # Return a data.frame
-      df = bind_rows("defaults" = res.def, "X2" = res.rndx2, "X4" = res.rndx4,
-        "X8" = res.rndx8, .id = "search.type")
-      df$n.defaults = n
-    } else {
-      df = NULL
-    }
-    return(df)
-  })
-  df = do.call("bind_rows", res)
-  saveRDS(df, stringBuilder("defaultLOOCV/save/", stri_paste(it, n, sep = "_"), lrn$id))
+      # Get Paramset on original scale, drop unused params 
+      # and make sure they are in the same order as the design
+      lrn.ps = fixParamSetForDesign(defaults, lrn)
+      # Search over the n defaults
+      defaults = fixDefaultsForWrapper(defaults, lrn, lrn.ps)
+      
+      if (getLearnerPackages(lrn) == "xgboost") {
+        # #Convert factors to numeric
+        # target = task$task$input$data.set$target.features
+        # cols = which(colnames(task$task$input$data.set$data) != target)
+        # task$task$input$data.set$data = data.frame(sapply(dummy.data.frame(task$task$input$data.set$data[,cols], sep = "_._"), as.numeric), 
+        #   task$task$input$data.set$data[,target,drop = FALSE])
+        # colnames(task$task$input$data.set$data) = make.names(colnames(task$task$input$data.set$data))
+        lrn = makeDummyFeaturesWrapper(lrn)
+      }
+      
+      lrn.def = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = lrn.ps,
+        makeTuneControlDesign(design = defaults))
+      res.def = evalParsOpenML(task, lrn.def)
+      
+      if (n != 4) {
+        # Search randomly (2x randomsearch)
+        lrn.rnd2 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(same.resampling.instance = FALSE,
+          maxit = 2 * nrow(defaults)))
+        res.rndx2 = evalParsOpenML(task, lrn.rnd2)
+        
+        # Search randomly (4x randomsearch)
+        lrn.rnd4 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 4 * nrow(defaults)))
+        res.rndx4 = evalParsOpenML(task, lrn.rnd4)
+        
+        lrn.rnd8 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 8 * nrow(defaults)))
+        res.rndx8 = evalParsOpenML(task, lrn.rnd8)
+        
+        # Return a data.frame
+        df = bind_rows("defaults" = res.def, "X2" = res.rndx2, "X4" = res.rndx4,  "X8" = res.rndx8, .id = "search.type")
+        df$n.defaults = n
+        df
+      } else {
+        df = NULL
+        df
+      }
+    })
+    df = do.call("bind_rows", res)
+    saveRDS(df, filepath)
+  } else {
+    df = readRDS(filepath)
+  }
   return(df)
 }
 
