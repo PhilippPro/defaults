@@ -66,7 +66,7 @@ makeObjFunction = function(surrogates_train, probs) {
 focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf) {
   
   # Do the focussearch
-  ctrl = makeFocusSearchControl(maxit = 4, restarts = 4, points = 10^3)
+  ctrl = makeFocusSearchControl(maxit = 2, restarts = 5, points = 10^5)
   # For debugging:
   # ctrl = makeFocusSearchControl(1, 1, points = 30)
   

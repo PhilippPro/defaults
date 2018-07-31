@@ -172,7 +172,28 @@ makeProgressBarOpts = function() {
   list(progress=progress)
 }
 
-
+# n = 4 random search can be obtained from random search for other n's
+refilln4 = function(lst) {
+  lst$oob.perf = lst$oob.perf %>% filter(n.defaults != 4) %>% filter(!(n.defaults == 8 & search.type == "X2"))
+  # Substitute random search with 8, 16 and 32 iters with known results
+  # RS with 8 iters:
+  x4n2 = lst$oob.perf %>% group_by(task.id) %>% filter(n.defaults == 2 &search.type == "X4")
+  x4n2$search.type = "X2"
+  # RS with 16 iters:
+  x8n2 = lst$oob.perf %>% group_by(task.id) %>% filter(n.defaults == 2 &search.type == "X8")
+  x8n2$search.type = "X4"
+  # RS with 32 iters:
+  x2n8 = lst$oob.perf %>% group_by(task.id) %>% filter(n.defaults == 8 &search.type == "X4")  
+  x2n8$search.type = "X8"
+  # n = 4 case
+  df = bind_rows(x4n2, x8n2, x2n8)
+  df$n.defaults = 4
+  # n = 8, X2 case:
+  x8n2$search.type = "X2"
+  x8n2$n.defaults = 8
+  lst$oob.perf = bind_rows(lst$oob.perf, df, x8n2)
+  return(lst)
+}
 
 # # Create Train/Test Splits: 
 # set.seed(199)

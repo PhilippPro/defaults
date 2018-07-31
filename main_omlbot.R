@@ -45,11 +45,11 @@ for(i in c(2)) { # seq_along(learner.names)
   # Create resampling train/test splits
   rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
   
-  registerDoMC(25)
-# ------------------------------------------------------------------------------------------------
+  registerDoMC(19)
+  # ------------------------------------------------------------------------------------------------
   # Defaults
   defs.file = stringBuilder("defaultLOOCV", "Q2_defaults", learner.names[i])
-  
+  # Compute defaults if not yet available
   if (!file.exists(defs.file)) {
     # Iterate over ResampleInstance and its indices
     defs = foreach(it = seq_len(rin$desc$iters)) %dopar% {
@@ -70,7 +70,7 @@ for(i in c(2)) { # seq_along(learner.names)
   # Evaluate found defaults on OOB-Tasks on OpenML
   defs = readRDS(defs.file)
   n.defs = c(2, 4, 6, 8, 10)
-  res = foreach(it = seq_len(rin$desc$iters)) %:%
+  def.res = foreach(it = seq_len(rin$desc$iters)) %:%
     foreach(n = n.defs) %dopar% {
       evalDefaultsOpenML(
         task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
@@ -79,11 +79,22 @@ for(i in c(2)) { # seq_along(learner.names)
         ps = surrogates$param.set,
         it = it,
         n = n)
-      }
-  oml.res = do.call("bind_rows", res)
+    }
+  # Evaluate random search on OOB-Tasks on OpenML
+  n.rs   = c(4, 8, 16, 32, 64)
+  rs.res = foreach(it = seq_len(rin$desc$iters)) %:%
+    foreach(n = n.rs) %dopar% {
+      evalRandomSearchOpenML(
+        task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
+        lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
+        defaults = defs$defaults,
+        ps = surrogates$param.set,
+        it = it,
+        n = n)
+    }
   
+  oml.res = bind_rows(do.call("bind_rows", def.res), do.call("bind_rows", rs.res))
   stopImplicitCluster()
-  
   saveRDS(list("oob.perf" = oml.res), stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i]))
   
   gc(); notify(title = "Job finished", msg = "Time to return to woRk!")
@@ -96,11 +107,12 @@ if (file.exists(results.file)) {
   lst = readRDS(results.file)
 } else {
   partial = lapply(list.files("defaultLOOCV/save", full.names = TRUE), readRDS)
-  lst = list(oob.perf = do.call("bind_rows", partial))
+  lst = list(oob.perf = do.call("bind_rows", partial) %>% filter(learner.id == "classif.svm.tuned")) 
 }
 
 library(ggpubr)
 library(patchwork)
+# x4 random search can be obtained from other splits and does not have to be computed
 
 for (measure in c("auc.test.mean", "acc.test.join", "f1.test.mean")) {
   # Boxplot of the different methods
@@ -137,26 +149,26 @@ for (measure in c("auc.test.mean", "acc.test.join", "f1.test.mean")) {
     ggtitle(stri_paste("Performance difference to defaults for ", measure))
   
   # Boxplot the defaults
-  gdata2 = lst$oob.perf %>%
-    filter(search.type == "defaults") %>%
-    select(one_of(measure), task.id, n.defaults) %>%
-    arrange(n.defaults) %>%
-    mutate(n.defaults = paste0("x", n.defaults)) %>%
-    spread(n.defaults, measure) %>%
-    transmute(
-      "2-4" = x2 - x4,
-      "4-6" = x4 - x6,
-      "6-8" = x6 - x8,
-      "8-10" = x8 - x10,
-      task.id = task.id
-      ) %>%
-    gather(delta, value = measure, -task.id)
-  
-  h = ggplot(gdata2) +
-    geom_boxplot(aes(x = delta, y = measure, color = delta)) +
-    xlab("No. defaults") + 
-    ylab(stri_paste("delta ", measure))
-  
+  # gdata2 = lst$oob.perf %>%
+  #   filter(search.type == "defaults") %>%
+  #   select(one_of(measure), task.id, n.defaults) %>%
+  #   arrange(n.defaults) %>%
+  #   mutate(n.defaults = paste0("x", n.defaults)) %>%
+  #   spread(n.defaults, measure) %>%
+  #   transmute(
+  #     "2-4" = x2 - x4,
+  #     "4-6" = x4 - x6,
+  #     "6-8" = x6 - x8,
+  #     "8-10" = x8 - x10,
+  #     task.id = task.id
+  #     ) %>%
+  #   gather(delta, value = measure, -task.id)
+  # 
+  # h = ggplot(gdata2) +
+  #   geom_boxplot(aes(x = delta, y = measure, color = delta)) +
+  #   xlab("No. defaults") + 
+  #   ylab(stri_paste("delta ", measure))
+  # 
   # Create combined plot
   pg = (p + facet_grid(cols = vars(n.defaults))) / (g + facet_grid(cols = vars(n.defaults)))
   ggsave(pg, filename = paste0("defaultLOOCV/", measure, unique(lst$oob.perf$learner.id), "Q2", ".png"), scale = 3)

@@ -22,14 +22,23 @@ evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
   return(perf)
 }
 
+evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
+  defaults = defaults[[it]][seq_len(n), , drop = FALSE]
+  evalOpenML("design", task.ids, lrn, defaults, ps, it, n, overwrite)
+}
+
+evalRandomSearchOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
+  evalOpenML("random", task.ids, lrn, defaults, ps, it, n, overwrite)
+}
+
 # Eval Hyperparams using OpenML datasets
 # @param task.ids  Vector of OpenML Task Ids
 # @param lrn Learner
 # @param defaults Set of default parameters
-evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
+evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
   
-  filepath = stringBuilder("defaultLOOCV/save", stri_paste(it, n, "perf", sep = "_"), lrn$id)
-
+  filepath = stringBuilder("defaultLOOCV/save", stri_paste(ctrl, n, it, "perf", sep = "_"), lrn$id)
+  
   if (!file.exists(filepath) | overwrite) {
     # The names of the surrogates are "OpenML Data Id's". We need "OpenML Task Id's.
     data_task_match = read.csv("oml_data_task.txt", sep = " ")
@@ -43,22 +52,19 @@ evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FA
     res = lapply(seq_len(length(tasks)), function(i) {
       
       # Define inner Resampling Scheme
-      inner.rdesc = hout # cv10
+      inner.rdesc = cv5 # cv10
       task = tasks[[i]]
-      defaults = defaults[[it]][seq_len(n), ]
-    
+      
       # Only take the first 'n' defaults
       if (getLearnerPackages(lrn) == "e1071") {
         lrn = setHyperPars(lrn, "type" = "C-classification")
-        # ps = c(ps, makeDiscreteLearnerParam("type", values = "C-classification"))
         defaults$type = "C-classification"
       }
       # Only use one thread for xbg
       if (getLearnerPackages(lrn) == "xgboost") {
         lrn = setHyperPars(lrn, "nthread" = 1L)
-        default$nthread = 1L
+        defaults$nthread = 1L
       }
-      
       
       # Get Paramset on original scale, drop unused params 
       # and make sure they are in the same order as the design
@@ -66,49 +72,29 @@ evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FA
       # Search over the n defaults
       defaults = fixDefaultsForWrapper(defaults, lrn, lrn.ps)
       
+      
       if (getLearnerPackages(lrn) == "xgboost") {
-        # #Convert factors to numeric
-        # target = task$task$input$data.set$target.features
-        # cols = which(colnames(task$task$input$data.set$data) != target)
-        # task$task$input$data.set$data = data.frame(sapply(dummy.data.frame(task$task$input$data.set$data[,cols], sep = "_._"), as.numeric), 
-        #   task$task$input$data.set$data[,target,drop = FALSE])
-        # colnames(task$task$input$data.set$data) = make.names(colnames(task$task$input$data.set$data))
         lrn = makeDummyFeaturesWrapper(lrn)
       }
-      
-      lrn.def = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = lrn.ps,
-        makeTuneControlDesign(design = defaults))
-      res.def = evalParsOpenML(task, lrn.def)
-      
-      if (n != 4) {
-        # Search randomly (2x randomsearch)
-        lrn.rnd2 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(same.resampling.instance = FALSE,
-          maxit = 2 * nrow(defaults)))
-        res.rndx2 = evalParsOpenML(task, lrn.rnd2)
-        
-        # Search randomly (4x randomsearch)
-        lrn.rnd4 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 4 * nrow(defaults)))
-        res.rndx4 = evalParsOpenML(task, lrn.rnd4)
-        
-        lrn.rnd8 = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = ps, makeTuneControlRandom(maxit = 8 * nrow(defaults)))
-        res.rndx8 = evalParsOpenML(task, lrn.rnd8)
-        
-        # Return a data.frame
-        df = bind_rows("defaults" = res.def, "X2" = res.rndx2, "X4" = res.rndx4,  "X8" = res.rndx8, .id = "search.type")
-        df$n.defaults = n
-        df
-      } else {
-        df = NULL
-        df
+      if (ctrl == "design") {
+        tune.ctrl = makeTuneControlDesign(same.resampling.instance = TRUE, design = defaults)
+      } else if (ctrl == "random") {
+        lrn.ps = ps # We want to tune over the optimized param space
+        tune.ctrl = makeTuneControlRandom(same.resampling.instance = TRUE, maxit = n)
       }
+      lrn.tune = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = lrn.ps, tune.ctrl)
+      res = evalParsOpenML(task, lrn.tune)
     })
-    df = do.call("bind_rows", res)
-    saveRDS(df, filepath)
+    res = do.call("rbind", res)
+    res$search.type = ctrl
+    res$n = n
+    saveRDS(res, filepath)
   } else {
-    df = readRDS(filepath)
+    res = readRDS(filepath)
   }
-  return(df)
+  return(res)
 }
+
 
 # Convert factors to character, eventually filter invalid params
 fixDefaultsForWrapper = function(pars, lrn, ps, check.feasible = TRUE) {
@@ -136,6 +122,7 @@ fixParamSetForDesign = function(defaults, lrn) {
   # Add NA for hierarchical params
   lrn.ps$pars = lapply(lrn.ps$pars, function(x) {
     x$special.vals = list(NA)
+    x$len = 1L
     return(x)
   })
   return(lrn.ps)
