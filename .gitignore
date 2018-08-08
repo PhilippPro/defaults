@@ -10,3 +10,4 @@
 *.arff
 *_gc.json
 
+packrat/lib*/

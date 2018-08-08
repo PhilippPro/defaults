@@ -3,6 +3,7 @@ library(stringi)    # string manipulation
 library(focussearch)# Search the surrogates
 library(doParallel) # Parallelization
 library(doMC)       # Parallelization
+library(doRNG)      # Parallel RNG
 library(foreach)    # Parallelization
 library(notifier)   # Optional, sends notification when long-runtime jobs finish
 load_all()
@@ -52,7 +53,7 @@ for(i in c(2)) { # seq_along(learner.names)
   # Compute defaults if not yet available
   if (!file.exists(defs.file)) {
     # Iterate over ResampleInstance and its indices
-    defs = foreach(it = seq_len(rin$desc$iters)) %dopar% {
+    defs = foreach(it = seq_len(rin$desc$iters)) %dorng% {
       set.seed(199 + i)
       # Search for defaults
       defs = searchDefaults(
@@ -65,7 +66,7 @@ for(i in c(2)) { # seq_along(learner.names)
     # Save found defaults as RDS
     saveRDS(list("defaults" = defs), defs.file)
   }
-
+  
   #-------------------------------------------------------------------------------------------------
   # Evaluate found defaults on OOB-Tasks on OpenML
   defs = readRDS(defs.file)
@@ -93,7 +94,22 @@ for(i in c(2)) { # seq_along(learner.names)
         n = n)
     }
   
-  oml.res = bind_rows(do.call("bind_rows", def.res), do.call("bind_rows", rs.res))
+  # Evaluate Package Defaults on OOB-Tasks on OpenML
+  pd.res = foreach(it = seq_len(rin$desc$iters)) %do%
+    evalPackageDefaultOpenML(
+      task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
+      lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
+      defaults = defs$defaults,
+      ps = surrogates$param.set,
+      it = it,
+      n = 1)
+  
+  # Evaluate against random search on Surrogates
+  # Evaluate random search on OOB-Tasks on OpenML
+  set.seed(1999 + i)
+  # This requires loaded RandomBot Data
+  rb.res = evalRandomBotData(measure = auc, i, n.rs = c(4, 8, 16, 32, 64), reps = 100) 
+
   stopImplicitCluster()
   saveRDS(list("oob.perf" = oml.res), stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i]))
   
@@ -107,68 +123,60 @@ if (file.exists(results.file)) {
   lst = readRDS(results.file)
 } else {
   partial = lapply(list.files("defaultLOOCV/save", full.names = TRUE), readRDS)
-  lst = list(oob.perf = do.call("bind_rows", partial) %>% filter(learner.id == "classif.svm.tuned")) 
+  lst = list(oob.perf = do.call("bind_rows", partial) %>% filter(learner.id == "classif.xgboost.dummied.tuned")) 
 }
 
 library(ggpubr)
 library(patchwork)
-# x4 random search can be obtained from other splits and does not have to be computed
 
-for (measure in c("auc.test.mean", "acc.test.join", "f1.test.mean")) {
+
+
+
   # Boxplot of the different methods
   p = ggboxplot(lst$oob.perf,
-    x = "search.type", y = measure, color = "search.type",
-    palette = c("#00AFBB", "#E7B800", "#FC4E07", "#FC88BB"),
+    x = "n", y = "auc.test.mean", color = "n",
+    # palette = c("#00AFBB", "#E7B800", "#FC4E07", "#FC88BB"),
     add = "jitter") +
-    ggtitle("Performance across all datasets")
+    ggtitle("Performance across all datasets") +
+    facet_wrap(~search.type, scales = "free_x")
+  
+  # Table with means and medians
+  lst$oob.perf %>%
+    group_by(task.id) %>%
+    mutate(
+      rnk = dense_rank(desc(auc.test.mean)),
+      mn = mean(auc.test.mean),
+      med = median(auc.test.mean)) %>%
+    ungroup() %>%
+    group_by(search.type, n) %>%
+    summarise(mean.ranks = mean(rnk), mean.means = mean(mn), mean.medians = mean(med))
   
   # Boxplot comparing to default search
   gdata = lst$oob.perf %>% 
     left_join(lst$oob.perf %>%
-      filter(search.type == "defaults") %>%
-      mutate(
-        auc.def = auc.test.mean,
-        acc.def = acc.test.join,
-        f1.def = f1.test.mean
+        filter(search.type == "defaults") %>%
+        mutate(
+          auc.def = auc.test.mean,
+          acc.def = acc.test.join,
+          f1.def = f1.test.mean
         ),
       by = c("task.id", "learner.id", "n.defaults")) %>%
     mutate(
       delta_auc = auc.test.mean.x - auc.def,
       delta_acc = acc.test.join.x - acc.def,
       delta_f1 = f1.test.mean.x - f1.def
-      ) %>%
+    ) %>%
     filter(search.type.x != "defaults")
   
   delta = switch(measure, "auc.test.mean" = "delta_auc", "acc.test.join" = "delta_acc", "f1.test.mean" = "delta_f1")
   # Boxplot Differences
   g = ggboxplot(gdata, x = "search.type.x", y = delta, color = "search.type.x",
-      palette = c("#E7B800", "#FC4E07", "#FC88BB"),
-      add = "jitter") +
+    palette = c("#E7B800", "#FC4E07", "#FC88BB"),
+    add = "jitter") +
     geom_abline(intercept = 0, slope = 0) +
     coord_cartesian(ylim = c(-0.4, max(gdata[delta]))) +
     ggtitle(stri_paste("Performance difference to defaults for ", measure))
   
-  # Boxplot the defaults
-  # gdata2 = lst$oob.perf %>%
-  #   filter(search.type == "defaults") %>%
-  #   select(one_of(measure), task.id, n.defaults) %>%
-  #   arrange(n.defaults) %>%
-  #   mutate(n.defaults = paste0("x", n.defaults)) %>%
-  #   spread(n.defaults, measure) %>%
-  #   transmute(
-  #     "2-4" = x2 - x4,
-  #     "4-6" = x4 - x6,
-  #     "6-8" = x6 - x8,
-  #     "8-10" = x8 - x10,
-  #     task.id = task.id
-  #     ) %>%
-  #   gather(delta, value = measure, -task.id)
-  # 
-  # h = ggplot(gdata2) +
-  #   geom_boxplot(aes(x = delta, y = measure, color = delta)) +
-  #   xlab("No. defaults") + 
-  #   ylab(stri_paste("delta ", measure))
-  # 
   # Create combined plot
   pg = (p + facet_grid(cols = vars(n.defaults))) / (g + facet_grid(cols = vars(n.defaults)))
   ggsave(pg, filename = paste0("defaultLOOCV/", measure, unique(lst$oob.perf$learner.id), "Q2", ".png"), scale = 3)
