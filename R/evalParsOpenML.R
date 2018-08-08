@@ -4,15 +4,7 @@
 # @param pars Single param Configuration
 evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
   
-  # Run Task in a separate process
-  # tryCatch(
-  #   run = callr::r(
-  #     function(task, lrn, measures, fun) {do.call(fun, list(task, lrn, measures))},
-  #     list(task = task, lrn = lrn, measures =  list(auc, f1), fun = fun),
-  #     error = "stack", show = TRUE),
-  #   error = function(e) print(e$stack)
-  # )
-  run = runTaskMlr2(task, lrn, measures = list(auc, f1))
+  run = runTaskMlr2(task, lrn, measures = list(mlr::auc, mlr::f1))
   
   # FIXME: Eventually upload the run
   perf = getBMRAggrPerformances(run$bmr, as.df = TRUE)
@@ -24,12 +16,14 @@ evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
 
 evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
   defaults = defaults[[it]][seq_len(n), , drop = FALSE]
-  evalOpenML("design", task.ids, lrn, defaults, ps, it, n, overwrite)
+  if (!(task.ids == "1486" & n >= 6))
+    evalOpenML("design", task.ids, lrn, defaults, ps, it, n, overwrite)
 }
 
 evalRandomSearchOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
   defaults = defaults[[it]]
-  evalOpenML("random", task.ids, lrn, defaults, ps, it, n, overwrite)
+  if (!(task.ids == "1486" & n <= 6))
+    evalOpenML("random", task.ids, lrn, defaults, ps, it, n, overwrite)
 }
 
 evalPackageDefaultOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
@@ -98,7 +92,7 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
   
   filepath = stringBuilder("defaultLOOCV/save", stri_paste(ctrl, n, it, "perf", sep = "_"), lrn$id)
   # For now we skip task.id %in% c("1486") as they are very big
-  if (!file.exists(filepath) | overwrite | !(task.id %in% c("1486") & n >= 6)) {
+  if (!file.exists(filepath) | overwrite) {
     # The names of the surrogates are "OpenML Data Id's". We need "OpenML Task Id's.
     data_task_match = read.csv("oml_data_task.txt", sep = " ")
     if (is.character(task.ids)) task.ids = as.numeric(task.ids)
@@ -138,11 +132,11 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
       
       if (ctrl == "design") {
         tune.ctrl = makeTuneControlDesign(same.resampling.instance = TRUE, design = defaults)
-        lrn.tune = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = lrn.ps, tune.ctrl)
+        lrn.tune = makeTuneWrapper(lrn, inner.rdesc, mlr::auc, par.set = lrn.ps, tune.ctrl)
       } else if (ctrl == "random") {
         lrn.ps = ps # We want to tune over a nicer param space (with trafos)
         tune.ctrl = makeTuneControlRandom(same.resampling.instance = TRUE, maxit = n)
-        lrn.tune = makeTuneWrapper(lrn, inner.rdesc, auc, par.set = lrn.ps, tune.ctrl)
+        lrn.tune = makeTuneWrapper(lrn, inner.rdesc, mlr::auc, par.set = lrn.ps, tune.ctrl)
       } else if (ctrl == "package-default") {
         lrn.tune = lrn
         lrn.tune$id = "classif.xgboost.dummied.tuned"

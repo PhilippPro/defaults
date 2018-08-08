@@ -1,11 +1,12 @@
-library(devtools)   # load_all()
-library(stringi)    # string manipulation
-library(focussearch)# Search the surrogates
-library(doParallel) # Parallelization
-library(doMC)       # Parallelization
-library(doRNG)      # Parallel RNG
-library(foreach)    # Parallelization
-library(notifier)   # Optional, sends notification when long-runtime jobs finish
+library(devtools)     # load_all()
+library(stringi)      # string manipulation
+library(focussearch)  # Search the surrogates
+library(doParallel)   # Parallelization
+library(doMC)         # Parallelization
+library(doRNG)        # Parallel RNG
+library(foreach)      # Parallelization
+library(patchwork)    # Vizualisation
+library(ggpubr)       # Vizualisation
 load_all()
 
 # Get randomBot Data from the figshare repository-------------------------
@@ -81,6 +82,7 @@ for(i in c(2)) { # seq_along(learner.names)
         it = it,
         n = n)
     }
+  
   # Evaluate random search on OOB-Tasks on OpenML
   n.rs   = c(4, 8, 16, 32, 64)
   rs.res = foreach(it = seq_len(rin$desc$iters)) %:%
@@ -95,7 +97,7 @@ for(i in c(2)) { # seq_along(learner.names)
     }
   
   # Evaluate Package Defaults on OOB-Tasks on OpenML
-  pd.res = foreach(it = seq_len(rin$desc$iters)) %do%
+  pd.res = foreach(it = seq_len(rin$desc$iters)) %dopar%
     evalPackageDefaultOpenML(
       task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
       lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
@@ -104,8 +106,7 @@ for(i in c(2)) { # seq_along(learner.names)
       it = it,
       n = 1)
   
-  # Evaluate against random search on Surrogates
-  # Evaluate random search on OOB-Tasks on OpenML
+  # Evaluate against random search on Surrogates (mean over 100 reps)
   set.seed(1999 + i)
   # This requires loaded RandomBot Data
   rb.res = evalRandomBotData(measure = auc, i, n.rs = c(4, 8, 16, 32, 64), reps = 100) 
@@ -113,7 +114,7 @@ for(i in c(2)) { # seq_along(learner.names)
   stopImplicitCluster()
   saveRDS(list("oob.perf" = oml.res), stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i]))
   
-  gc(); notify(title = "Job finished", msg = "Time to return to woRk!")
+  gc();
 }
 
 # Create Plots comparing to random search ------------------------------------------------------------
@@ -123,13 +124,10 @@ if (file.exists(results.file)) {
   lst = readRDS(results.file)
 } else {
   partial = lapply(list.files("defaultLOOCV/save", full.names = TRUE), readRDS)
-  lst = list(oob.perf = do.call("bind_rows", partial) %>% filter(learner.id == "classif.xgboost.dummied.tuned")) 
+  lst = list(oob.perf = do.call("bind_rows", partial) %>%
+    filter(learner.id == "classif.xgboost.dummied.tuned") %>%
+    filter(task.id != "nomao")) # Nomao takes really long
 }
-
-library(ggpubr)
-library(patchwork)
-
-
 
 
   # Boxplot of the different methods
@@ -143,6 +141,7 @@ library(patchwork)
   # Table with means and medians
   lst$oob.perf %>%
     group_by(task.id) %>%
+    filter(search.type != "randomBotData") %>%
     mutate(
       rnk = dense_rank(desc(auc.test.mean)),
       mn = mean(auc.test.mean),

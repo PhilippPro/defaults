@@ -20,4 +20,17 @@ Depends:
   stringi (>= 1.1.2),
   focussearch,
   ggplot2,
-  farff
+  farff,
+  foreach,
+  doRNG,
+  devtools,
+  doParallel,
+  roxygen2,
+  Cubist,
+  glmnet,
+  ranger,
+  xgboost,
+  e1071,
+  kknn,
+  ggpubr,
+  patchwork
