@@ -98,7 +98,7 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
   
   filepath = stringBuilder("defaultLOOCV/save", stri_paste(ctrl, n, it, "perf", sep = "_"), lrn$id)
   # For now we skip task.id %in% c("1486") as they are very big
-  if (!file.exists(filepath) | overwrite | !(task.id %in% c("1486"))) {
+  if (!file.exists(filepath) | overwrite | !(task.id %in% c("1486") & n >= 6)) {
     # The names of the surrogates are "OpenML Data Id's". We need "OpenML Task Id's.
     data_task_match = read.csv("oml_data_task.txt", sep = " ")
     if (is.character(task.ids)) task.ids = as.numeric(task.ids)
