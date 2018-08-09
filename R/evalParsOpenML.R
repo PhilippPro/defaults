@@ -41,7 +41,7 @@ evalRandomBotData = function(measure = auc, i, n.rs = c(4, 8, 16, 32, 64), reps 
   lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE))
   
   # Make sure we do not recompute stuff: Save results to a file and check if file exists
-  filepath = stringBuilder("defaultLOOCV/save", stri_paste("randomBotData", n, "perf", sep = "_"), lrn$id)
+  filepath = stringBuilder("defaultLOOCV/save", stri_paste("randomBotData","all", "perf", sep = "_"), lrn$id)
   if (!file.exists(filepath) | overwrite) {
     data_task_match = read.csv("oml_data_task.txt", sep = " ")
     # Get the data into the right format
@@ -139,7 +139,7 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
         lrn.tune = makeTuneWrapper(lrn, inner.rdesc, mlr::auc, par.set = lrn.ps, tune.ctrl)
       } else if (ctrl == "package-default") {
         lrn.tune = lrn
-        lrn.tune$id = "classif.xgboost.dummied.tuned"
+        lrn.tune$id = stri_paste(lrn.tune$id, ".tuned")
       }
       res = evalParsOpenML(task, lrn.tune)
       
