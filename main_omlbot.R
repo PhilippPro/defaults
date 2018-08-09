@@ -110,7 +110,7 @@ for(i in c(2)) { # seq_along(learner.names)
   set.seed(1999 + i)
   # This requires loaded RandomBot Data
   rb.res = evalRandomBotData(measure = mlr::auc, i, n.rs = c(4, 8, 16, 32, 64), reps = 100) 
-
+  
   stopImplicitCluster()
   saveRDS(list("oob.perf" = oml.res), stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i]))
   
@@ -123,61 +123,78 @@ results.file = stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i])
 if (file.exists(results.file)) {
   lst = readRDS(results.file)
 } else {
-  partial = lapply(list.files("defaultLOOCV/save", full.names = TRUE), readRDS)
-  lst = list(oob.perf = do.call("bind_rows", partial) %>%
-    filter(stri_detect_fixed(learner.id , "rpart")) %>%
-    filter(task.id != "nomao")) # Nomao takes really long
+  learner = "xgboost"
+  files = list.files("defaultLOOCV/save", full.names = TRUE)
+  files = files[stri_detect_fixed(files , learner)]
+  lst = list(oob.perf = do.call("bind_rows", lapply(files, readRDS)) %>%
+      filter(stri_detect_fixed(learner.id , learner)) %>%
+      filter(task.id != "nomao")) # Nomao takes really long
 }
 
+# Table with ranks means and medians
+rnks = lst$oob.perf %>%
+  group_by(task.id) %>%
+  filter(search.type != "randomBotData") %>%
+  mutate(rnk = dense_rank(desc(auc.test.mean))) %>%
+  ungroup() %>%
+  group_by(search.type, n) %>%
+  summarise(mean_rank_auc = mean(rnk), mean_auc = mean(auc.test.mean), median_auc = median(auc.test.mean), cnt = n()) 
 
-  # Boxplot of the different methods
-  p = ggboxplot(lst$oob.perf,
-    x = "n", y = "auc.test.mean", color = "n",
-    # palette = c("#00AFBB", "#E7B800", "#FC4E07", "#FC88BB"),
-    add = "jitter") +
-    ggtitle("Performance across all datasets") +
-    facet_wrap(~search.type, scales = "free_x")
-  
-  # Table with means and medians
-  lst$oob.perf %>%
-    group_by(task.id) %>%
-    filter(search.type != "randomBotData") %>%
-    mutate(rnk = dense_rank(desc(auc.test.mean))) %>%
-    ungroup() %>%
-    group_by(search.type, n) %>%
-    summarise(mean.ranks = mean(rnk), mean = mean(auc.test.mean), median = median(auc.test.mean), cnt = n())
-  
-  # Boxplot comparing to default search
-  gdata = lst$oob.perf %>% 
-    left_join(lst$oob.perf %>%
-        filter(search.type == "defaults") %>%
-        mutate(
-          auc.def = auc.test.mean,
-          acc.def = acc.test.join,
-          f1.def = f1.test.mean
-        ),
-      by = c("task.id", "learner.id", "n.defaults")) %>%
-    mutate(
-      delta_auc = auc.test.mean.x - auc.def,
-      delta_acc = acc.test.join.x - acc.def,
-      delta_f1 = f1.test.mean.x - f1.def
-    ) %>%
-    filter(search.type.x != "defaults")
-  
-  delta = switch(measure, "auc.test.mean" = "delta_auc", "acc.test.join" = "delta_acc", "f1.test.mean" = "delta_f1")
-  # Boxplot Differences
-  g = ggboxplot(gdata, x = "search.type.x", y = delta, color = "search.type.x",
-    palette = c("#E7B800", "#FC4E07", "#FC88BB"),
-    add = "jitter") +
-    geom_abline(intercept = 0, slope = 0) +
-    coord_cartesian(ylim = c(-0.4, max(gdata[delta]))) +
-    ggtitle(stri_paste("Performance difference to defaults for ", measure))
-  
-  # Create combined plot
-  pg = (p + facet_grid(cols = vars(n.defaults))) / (g + facet_grid(cols = vars(n.defaults)))
-  ggsave(pg, filename = paste0("defaultLOOCV/", measure, unique(lst$oob.perf$learner.id), "Q2", ".png"), scale = 3)
-}
+rp = ggplot(rnks, aes(x = as.factor(n), y = mean_rank_auc, color = search.type)) +
+  geom_point() +
+  ylab("Average rank") + xlab("No. defaults")
 
+write.csv(rnks, file = paste0("defaultLOOCV/", "auc.test.mean_Q2_perf_table", learner.names[i], ".csv"))
+
+# Boxplot of the different methods
+p = ggboxplot(lst$oob.perf %>% filter(search.type != "randomBotData"),
+  x = "n", y = "auc.test.mean", color = "n",
+  # palette = c("#00AFBB", "#E7B800", "#FC4E07", "#FC88BB"),
+  add = "jitter") +
+  ggtitle("Performance across all datasets") +
+  facet_wrap(~search.type, scales = "free_x")
+
+r = ggboxplot(lst$oob.perf %>% filter(search.type == "randomBotData"),
+  x = "n", y = "auc.test.mean", color = "n",
+  # palette = c("#00AFBB", "#E7B800", "#FC4E07", "#FC88BB"),
+  add = "jitter") +
+  ggtitle("Performance across all datasets") +
+  facet_wrap(~search.type, scales = "free_x")
+
+# Boxplot comparing to package default
+gdata = lst$oob.perf %>% 
+  filter(search.type != "randomBotData") %>%
+  left_join(lst$oob.perf %>%
+      filter(search.type == "package-default") %>%
+      mutate(
+        auc.def = auc.test.mean,
+        acc.def = acc.test.join,
+        f1.def = f1.test.mean
+      ),
+    by = c("task.id", "learner.id")) %>%
+  mutate(
+    delta_auc = auc.test.mean.x - auc.def,
+    delta_acc = acc.test.join.x - acc.def,
+    delta_f1 = f1.test.mean.x - f1.def
+  ) %>%
+  filter(search.type.x != "package-default") %>%
+  mutate(n = as.factor(n.x))
+
+delta = switch("auc.test.mean", "auc.test.mean" = "delta_auc", "acc.test.join" = "delta_acc", "f1.test.mean" = "delta_f1")
+# Boxplot Differences
+g = ggboxplot(gdata, x = "search.type.x", y = delta, color = "n") +
+  geom_abline(intercept = 0, slope = 0) +
+  ggtitle(stri_paste("Performance difference to defaults for ", "auc.test.mean")) +
+  ylab("Improvement over package defaults") +
+  xlab("Search.type")
+
+# Create combined plot
+ggsave(plot = (p / g),
+  filename = paste0("defaultLOOCV/", "auc.test.mean", learner.names[i], "Q2", ".png"),
+  scale = 3)
+ggsave(plot = (rp / r),
+  filename = paste0("defaultLOOCV/", "auc.test.mean_randomBot", learner.names[i], "Q2", ".png"),
+  scale = 3)
 
 
 
