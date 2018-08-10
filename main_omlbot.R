@@ -38,7 +38,7 @@ stopImplicitCluster()
 
 # Forward selection ----------------------------------------------------------------------------------
 files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist_classif")]
-i = 1
+i = 2
 catf("Learner: %s", learner.names[i])
 set.seed(199 + i)
 
@@ -48,7 +48,7 @@ surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names
 rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
 
 registerDoMC(8)
-defs.file = stringBuilder("defaultLOOCV", "Q2_defaults", learner.names[i])
+defs.file = stringBuilder("defaultLOOCV", "mean_defaults", learner.names[i])
 # ------------------------------------------------------------------------------------------------
 # Defaults
 # Compute defaults if not yet available
