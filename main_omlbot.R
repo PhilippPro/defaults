@@ -38,7 +38,7 @@ stopImplicitCluster()
 
 # Forward selection ----------------------------------------------------------------------------------
 files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist_classif")]
-i = 6
+i = 1
 catf("Learner: %s", learner.names[i])
 set.seed(199 + i)
 
@@ -52,6 +52,7 @@ defs.file = stringBuilder("defaultLOOCV", "Q2_defaults", learner.names[i])
 # ------------------------------------------------------------------------------------------------
 # Defaults
 # Compute defaults if not yet available
+# probs in 0.5; mean, cycle
 if (!file.exists(defs.file)) {
   # Iterate over ResampleInstance and its indices
   defs = foreach(it = seq_len(rin$desc$iters)) %dorng% {
@@ -104,7 +105,7 @@ pd.res = foreach(it = seq_len(rin$desc$iters)) %dopar%
     defaults = defs$defaults,
     ps = surrogates$param.set,
     it = it,
-    n = 1)
+    n = 1, overwrite = TRUE)
 
 # Evaluate against random search on Surrogates (mean over 100 reps)
 set.seed(1999 + i)
@@ -134,7 +135,7 @@ if (file.exists(results.file)) {
 rnks = lst$oob.perf %>%
   group_by(task.id) %>%
   filter(search.type != "randomBotData") %>%
-  mutate(rnk = dense_rank(desc(auc.test.mean))) %>%
+  mutate(rnk = min_rank(desc(auc.test.mean))) %>%
   ungroup() %>%
   group_by(search.type, n) %>%
   summarise(mean_rank_auc = mean(rnk), mean_auc = mean(auc.test.mean), median_auc = median(auc.test.mean), cnt = n()) 
