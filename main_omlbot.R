@@ -38,84 +38,83 @@ stopImplicitCluster()
 
 # Forward selection ----------------------------------------------------------------------------------
 files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist_classif")]
-for(i in c(2)) { # seq_along(learner.names)
-  catf("Learner: %s", learner.names[i])
-  set.seed(199 + i)
-  
-  # Read surrogates from Hard Drive
-  surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
-  # Create resampling train/test splits
-  rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
-  
-  registerDoMC(8)
-  defs.file = stringBuilder("defaultLOOCV", "Q2_defaults", learner.names[i])
-  # ------------------------------------------------------------------------------------------------
-  # Defaults
-  # Compute defaults if not yet available
-  if (!file.exists(defs.file)) {
-    # Iterate over ResampleInstance and its indices
-    defs = foreach(it = seq_len(rin$desc$iters)) %dorng% {
-      set.seed(199 + i)
-      # Search for defaults
-      defs = searchDefaults(
-        surrogates$surrogates[rin$train.inds[[it]]], # training surrogates (L-1-Out-CV)
-        surrogates$param.set, # parameter space to search through
-        n.defaults = 10, # Number of defaults we want to find
-        probs = 0.5) # Quantile we want to optimize
-      return(defs)
-    }
-    # Save found defaults as RDS
-    saveRDS(list("defaults" = defs), defs.file)
+i = 6
+catf("Learner: %s", learner.names[i])
+set.seed(199 + i)
+
+# Read surrogates from Hard Drive
+surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
+# Create resampling train/test splits
+rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
+
+registerDoMC(8)
+defs.file = stringBuilder("defaultLOOCV", "Q2_defaults", learner.names[i])
+# ------------------------------------------------------------------------------------------------
+# Defaults
+# Compute defaults if not yet available
+if (!file.exists(defs.file)) {
+  # Iterate over ResampleInstance and its indices
+  defs = foreach(it = seq_len(rin$desc$iters)) %dorng% {
+    set.seed(199 + i)
+    # Search for defaults
+    defs = searchDefaults(
+      surrogates$surrogates[rin$train.inds[[it]]], # training surrogates (L-1-Out-CV)
+      surrogates$param.set, # parameter space to search through
+      n.defaults = 10, # Number of defaults we want to find
+      probs = 0.5) # Quantile we want to optimize
+    return(defs)
   }
-  
-  #-------------------------------------------------------------------------------------------------
-  # Evaluate found defaults on OOB-Tasks on OpenML
-  defs = readRDS(defs.file)
-  n.defs = c(2, 4, 6, 8, 10)
-  def.res = foreach(it = seq_len(rin$desc$iters)) %:%
-    foreach(n = n.defs) %dopar% {
-      evalDefaultsOpenML(
-        task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
-        lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
-        defaults = defs$defaults,
-        ps = surrogates$param.set,
-        it = it,
-        n = n)
-    }
-  
-  # Evaluate random search on OOB-Tasks on OpenML
-  n.rs   = c(4, 8, 16, 32, 64)
-  rs.res = foreach(it = seq_len(rin$desc$iters)) %:%
-    foreach(n = n.rs) %dopar% {
-      evalRandomSearchOpenML(
-        task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
-        lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
-        defaults = defs$defaults,
-        ps = surrogates$param.set,
-        it = it,
-        n = n)
-    }
-  
-  # Evaluate Package Defaults on OOB-Tasks on OpenML
-  pd.res = foreach(it = seq_len(rin$desc$iters)) %dopar%
-    evalPackageDefaultOpenML(
+  # Save found defaults as RDS
+  saveRDS(list("defaults" = defs), defs.file)
+}
+
+#-------------------------------------------------------------------------------------------------
+# Evaluate found defaults on OOB-Tasks on OpenML
+defs = readRDS(defs.file)
+n.defs = c(2, 4, 6, 8, 10)
+def.res = foreach(it = seq_len(rin$desc$iters)) %:%
+  foreach(n = n.defs) %dopar% {
+    evalDefaultsOpenML(
       task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
       lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
       defaults = defs$defaults,
       ps = surrogates$param.set,
       it = it,
-      n = 1)
-  
-  # Evaluate against random search on Surrogates (mean over 100 reps)
-  set.seed(1999 + i)
-  # This requires loaded RandomBot Data
-  rb.res = evalRandomBotData(measure = mlr::auc, i, n.rs = c(4, 8, 16, 32, 64), reps = 100) 
-  
-  stopImplicitCluster()
-  saveRDS(list("oob.perf" = oml.res), stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i]))
-  
-  gc();
-}
+      n = n)
+  }
+
+# Evaluate random search on OOB-Tasks on OpenML
+n.rs   = c(4, 8, 16, 32, 64)
+rs.res = foreach(it = seq_len(rin$desc$iters)) %:%
+  foreach(n = n.rs) %dopar% {
+    evalRandomSearchOpenML(
+      task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
+      lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
+      defaults = defs$defaults,
+      ps = surrogates$param.set,
+      it = it,
+      n = n)
+  }
+
+# Evaluate Package Defaults on OOB-Tasks on OpenML
+pd.res = foreach(it = seq_len(rin$desc$iters)) %dopar%
+  evalPackageDefaultOpenML(
+    task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
+    lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
+    defaults = defs$defaults,
+    ps = surrogates$param.set,
+    it = it,
+    n = 1)
+
+# Evaluate against random search on Surrogates (mean over 100 reps)
+set.seed(1999 + i)
+# This requires loaded RandomBot Data
+rb.res = evalRandomBotData(measure = mlr::auc, i, n.rs = c(4, 8, 16, 32, 64), reps = 100) 
+
+stopImplicitCluster()
+saveRDS(list("oob.perf" = oml.res), stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i]))
+
+gc();
 
 # Create Plots comparing to random search ------------------------------------------------------------
 # Get the saved performances (either partial or full result)
@@ -123,12 +122,12 @@ results.file = stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i])
 if (file.exists(results.file)) {
   lst = readRDS(results.file)
 } else {
-  learner = "xgboost"
+  learner = stri_sub(str = learner.names[i], from = 13)
   files = list.files("defaultLOOCV/save", full.names = TRUE)
   files = files[stri_detect_fixed(files , learner)]
   lst = list(oob.perf = do.call("bind_rows", lapply(files, readRDS)) %>%
       filter(stri_detect_fixed(learner.id , learner)) %>%
-      filter(task.id != "nomao")) # Nomao takes really long
+      filter(!(task.id %in% c("nomao", "Bioresponse")))) # nomao | Bioresponse take really long
 }
 
 # Table with ranks means and medians
