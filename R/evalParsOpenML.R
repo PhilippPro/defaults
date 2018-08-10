@@ -16,13 +16,13 @@ evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
 
 evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
   defaults = defaults[[it]][seq_len(n), , drop = FALSE]
-  if (!(task.ids == "1486" & n >= 6))
+  if (!(task.ids %in% c("1486", "4134") & n >= 6))
     evalOpenML("design", task.ids, lrn, defaults, ps, it, n, overwrite)
 }
 
 evalRandomSearchOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
   defaults = defaults[[it]]
-  if (!(task.ids == "1486" & n <= 6))
+  if (!(task.ids %in% c("1486", "4134") & n <= 6))
     evalOpenML("random", task.ids, lrn, defaults, ps, it, n, overwrite)
 }
 
