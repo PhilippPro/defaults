@@ -15,6 +15,12 @@ searchDefaults = function(surrogates_train, par.set, n.defaults = 10, probs = 0.
   # Compute n.defaults  default parameters iteratively
   # Earlier found defaults influence later performances
   for (j in seq_len(n.defaults)) {
+    if (probs == "cycle") {
+      # Cycle through different results
+      cycle.probs = c(0.5, 0.66, 0.33)
+      pfun = makeObjFunction(surrogates_train, cycle.probs[(j %% 3) + 1])
+    }
+
     # Search for optimal points given previous defaults
     z = focusSearchDefaults(pfun, surrogates_train, par.set, defaults.perf = defaults.perf)
     catf("New best y: %f found for x: %s", z$y, paste0(z$x, collapse = ", "))
@@ -41,7 +47,11 @@ makeObjFunction = function(surrogates_train, probs) {
     # Compute min of prd and defaults.perf for each dataset
     parmin = apply(cbind(x, defaults.perf), 1, min)
     # and compute quantile over the datasets
-    quantile(parmin, probs = probs)
+    if (is.numeric(probs)) {
+      quantile(parmin, probs = probs)
+    } else if (probs == "mean") {
+      mean(parmin)
+    }
   }
 
   # Predict newdata, compute prediction
