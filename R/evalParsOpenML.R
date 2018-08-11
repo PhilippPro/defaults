@@ -137,13 +137,7 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
       if (getLearnerPackages(lrn) == "xgboost") {
         lrn = makeDummyFeaturesWrapper(lrn)
       }
-<<<<<<< HEAD
-      
       if (ctrl %in% c("design", "defaults_mean", "defaults_cycle")) {
-=======
-
-      if (ctrl == "design") {
->>>>>>> 66036de1917e7345f53ba339969ef1c837046ab0
         tune.ctrl = makeTuneControlDesign(same.resampling.instance = TRUE, design = defaults)
         lrn.tune = makeTuneWrapper(lrn, inner.rdesc, mlr::auc, par.set = lrn.ps, tune.ctrl)
       } else if (ctrl == "random") {
@@ -155,8 +149,8 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
         lrn.tune$id = stri_paste(lrn.tune$id, ".tuned")
       }
       res = evalParsOpenML(task, lrn.tune)
-
     })
+    
     res = do.call("rbind", res)
     res$search.type = ctrl
     res$n = n
