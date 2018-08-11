@@ -47,12 +47,12 @@ surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names
 # Create resampling train/test splits
 rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
 
-registerDoMC(8)
+registerDoMC(20)
 defs.file = stringBuilder("defaultLOOCV", "mean_defaults", learner.names[i])
 # ------------------------------------------------------------------------------------------------
 # Defaults
 # Compute defaults if not yet available
-# probs in 0.5; mean, cycle
+# probs : 0.5; mean, cycle
 if (!file.exists(defs.file)) {
   # Iterate over ResampleInstance and its indices
   defs = foreach(it = seq_len(rin$desc$iters)) %dorng% {
@@ -62,7 +62,7 @@ if (!file.exists(defs.file)) {
       surrogates$surrogates[rin$train.inds[[it]]], # training surrogates (L-1-Out-CV)
       surrogates$param.set, # parameter space to search through
       n.defaults = 10, # Number of defaults we want to find
-      probs = 0.5) # Quantile we want to optimize
+      probs = "mean") # Quantile we want to optimize
     return(defs)
   }
   # Save found defaults as RDS
@@ -81,7 +81,8 @@ def.res = foreach(it = seq_len(rin$desc$iters)) %:%
       defaults = defs$defaults,
       ps = surrogates$param.set,
       it = it,
-      n = n)
+      n = n,
+      aggr.fun = defs$aggr.fun)
   }
 
 # Evaluate random search on OOB-Tasks on OpenML
@@ -118,18 +119,15 @@ saveRDS(list("oob.perf" = oml.res), stringBuilder("defaultLOOCV", "Q2_perf", lea
 gc();
 
 # Create Plots comparing to random search ------------------------------------------------------------
+
+i = 6
 # Get the saved performances (either partial or full result)
-results.file = stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i])
-if (file.exists(results.file)) {
-  lst = readRDS(results.file)
-} else {
-  learner = stri_sub(str = learner.names[i], from = 13)
-  files = list.files("defaultLOOCV/save", full.names = TRUE)
-  files = files[stri_detect_fixed(files , learner)]
-  lst = list(oob.perf = do.call("bind_rows", lapply(files, readRDS)) %>%
-      filter(stri_detect_fixed(learner.id , learner)) %>%
-      filter(!(task.id %in% c("nomao", "Bioresponse")))) # nomao | Bioresponse take really long
-}
+learner = stri_sub(str = learner.names[i], from = 13)
+files = list.files("defaultLOOCV/save", full.names = TRUE)
+files = files[stri_detect_fixed(files , learner)]
+lst = list(oob.perf = do.call("bind_rows", lapply(files, readRDS)) %>%
+    filter(stri_detect_fixed(learner.id , learner)) %>%
+    filter(!(task.id %in% c("nomao", "Bioresponse")))) # nomao | Bioresponse take really long
 
 # Table with ranks means and medians
 rnks = lst$oob.perf %>%
@@ -138,7 +136,9 @@ rnks = lst$oob.perf %>%
   mutate(rnk = min_rank(desc(auc.test.mean))) %>%
   ungroup() %>%
   group_by(search.type, n) %>%
-  summarise(mean_rank_auc = mean(rnk), mean_auc = mean(auc.test.mean), median_auc = median(auc.test.mean), cnt = n()) 
+  summarise(mean_rank_auc = mean(rnk), mean_auc = mean(auc.test.mean), median_auc = median(auc.test.mean), cnt = n())
+rnks
+
 
 rp = ggplot(rnks, aes(x = as.factor(n), y = mean_rank_auc, color = search.type)) +
   geom_point() +

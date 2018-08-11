@@ -14,15 +14,24 @@ evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
   return(perf)
 }
 
-evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
+evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, aggr.fun = NULL, overwrite = FALSE) {
   defaults = defaults[[it]][seq_len(n), , drop = FALSE]
-  if (!(task.ids %in% c("1486", "4134") & n >= 6))
-    evalOpenML("design", task.ids, lrn, defaults, ps, it, n, overwrite)
+  if (!(task.ids %in% c("1486", "4134"))) {
+    if (!is.null(defs$aggr.fun)) {
+      defs.aggr.fun = switch(defs$aggr.fun,
+        "mean" = "defaults_mean",
+        "cycle" = "defaults_cycle")
+    } else {
+      defs.aggr.fun = "design" # Median
+    }
+    
+    evalOpenML(defs.aggr.fun, task.ids, lrn, defaults, ps, it, n, overwrite)
+  }
 }
 
 evalRandomSearchOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
   defaults = defaults[[it]]
-  if (!(task.ids %in% c("1486", "4134") & n <= 6))
+  if (!(task.ids %in% c("1486", "4134")))
     evalOpenML("random", task.ids, lrn, defaults, ps, it, n, overwrite)
 }
 
@@ -130,7 +139,7 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
         lrn = makeDummyFeaturesWrapper(lrn)
       }
       
-      if (ctrl == "design") {
+      if (ctrl %in% c("design", "defaults_mean", "defaults_cycle")) {
         tune.ctrl = makeTuneControlDesign(same.resampling.instance = TRUE, design = defaults)
         lrn.tune = makeTuneWrapper(lrn, inner.rdesc, mlr::auc, par.set = lrn.ps, tune.ctrl)
       } else if (ctrl == "random") {
