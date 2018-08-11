@@ -3,26 +3,26 @@
 # @param lrn Learner
 # @param pars Single param Configuration
 evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
-  
+
   run = runTaskMlr2(task, lrn, measures = list(mlr::auc, mlr::f1))
-  
+
   # FIXME: Eventually upload the run
   perf = getBMRAggrPerformances(run$bmr, as.df = TRUE)
   perf$task.id = as.character(perf$task.id)
   perf$learner.id = as.character(perf$learner.id)
-  
+
   return(perf)
 }
 
 evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
   defaults = defaults[[it]][seq_len(n), , drop = FALSE]
-  if (!(task.ids %in% c("1486", "4134") & n >= 6))
+  if (!(task.ids %in% c("1486", "4134")))
     evalOpenML("design", task.ids, lrn, defaults, ps, it, n, overwrite)
 }
 
 evalRandomSearchOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
   defaults = defaults[[it]]
-  if (!(task.ids %in% c("1486", "4134") & n <= 6))
+  if (!(task.ids %in% c("1486", "4134")))
     evalOpenML("random", task.ids, lrn, defaults, ps, it, n, overwrite)
 }
 
@@ -36,10 +36,10 @@ evalPackageDefaultOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrit
 #' # reps = number of repetition
 #' # i learner.names[i]
 evalRandomBotData = function(measure = auc, i, n.rs = c(4, 8, 16, 32, 64), reps = 100, overwrite = FALSE) {
-  
+
   # Create the learner
   lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE))
-  
+
   # Make sure we do not recompute stuff: Save results to a file and check if file exists
   filepath = stringBuilder("defaultLOOCV/save", stri_paste("randomBotData","all", "perf", sep = "_"), lrn$id)
   if (!file.exists(filepath) | overwrite) {
@@ -89,7 +89,7 @@ evalRandomBotData = function(measure = auc, i, n.rs = c(4, 8, 16, 32, 64), reps 
 # @param lrn Learner
 # @param defaults Set of default parameters
 evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
-  
+
   filepath = stringBuilder("defaultLOOCV/save", stri_paste(ctrl, n, it, "perf", sep = "_"), lrn$id)
   # For now we skip task.id %in% c("1486") as they are very big
   if (!file.exists(filepath) | overwrite) {
@@ -97,17 +97,17 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
     data_task_match = read.csv("oml_data_task.txt", sep = " ")
     if (is.character(task.ids)) task.ids = as.numeric(task.ids)
     tasks = foreach(task.id = task.ids) %do% getOMLTask(data_task_match[data_task_match$data.id == task.id, "task.id"])
-    
+
     # In an Wrapper that selects the best default:
     lrn = setPredictType(lrn, "prob")
-    
+
     # Loop over Hold-Out Datasets
     res = lapply(seq_len(length(tasks)), function(i) {
-      
+
       # Define inner Resampling Scheme
       inner.rdesc = cv5 # cv10
       task = tasks[[i]]
-      
+
       # Only take the first 'n' defaults
       if (getLearnerPackages(lrn) == "e1071") {
         lrn = setHyperPars(lrn, "type" = "C-classification")
@@ -118,18 +118,18 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
         lrn = setHyperPars(lrn, "nthread" = 1L)
         defaults$nthread = 1L
       }
-      
-      # Get Paramset on original scale, drop unused params 
+
+      # Get Paramset on original scale, drop unused params
       # and make sure they are in the same order as the design
       lrn.ps = fixParamSetForDesign(defaults, lrn)
       # Search over the n defaults
       defaults = fixDefaultsForWrapper(defaults, lrn, lrn.ps)
-      
-      
+
+
       if (getLearnerPackages(lrn) == "xgboost") {
         lrn = makeDummyFeaturesWrapper(lrn)
       }
-      
+
       if (ctrl == "design") {
         tune.ctrl = makeTuneControlDesign(same.resampling.instance = TRUE, design = defaults)
         lrn.tune = makeTuneWrapper(lrn, inner.rdesc, mlr::auc, par.set = lrn.ps, tune.ctrl)
@@ -142,7 +142,7 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
         lrn.tune$id = stri_paste(lrn.tune$id, ".tuned")
       }
       res = evalParsOpenML(task, lrn.tune)
-      
+
     })
     res = do.call("rbind", res)
     res$search.type = ctrl
@@ -157,10 +157,10 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
 
 # Convert factors to character, eventually filter invalid params
 fixDefaultsForWrapper = function(pars, lrn, ps, check.feasible = TRUE) {
-  
+
   # Convert factor params to character
   pars = data.frame(lapply(pars, function(x) {if (is.factor(x)) x = as.character(x); x}), stringsAsFactors = FALSE)
-  
+
   # Filter invalid params
   if (check.feasible) {
     ps = getParamSet(lrn)
@@ -196,10 +196,10 @@ runTaskMlr2 = function(task, learner, measures = NULL,  scimark.vector = NULL, m
   checkmate::assertChoice(task$task.type, c("Supervised Classification", "Supervised Regression"))
   if (!is.null(scimark.vector))
     checkmate::assertNumeric(scimark.vector, lower = 0, len = 6, finite = TRUE, any.missing = FALSE, all.missing = FALSE)
-  
+
   # create parameter list
   parameter.setting = OpenML::makeOMLRunParList(learner)
-  
+
   # set default evaluation measure for classification and regression
   if (task$input$evaluation.measures == "") {
     if (task$task.type == "Supervised Classification")
@@ -207,18 +207,18 @@ runTaskMlr2 = function(task, learner, measures = NULL,  scimark.vector = NULL, m
     else
       task$input$evaluation.measures = "root_mean_squared_error"
   }
-  
+
   # create Flow
   flow = OpenML::convertMlrLearnerToOMLFlow(learner)
-  
+
   # Create mlr task with estimation procedure and evaluation measure
   z = OpenML::convertOMLTaskToMlr(task, measures = measures, ...)
-  
+
   # Create OMLRun
   bmr = mlr::benchmark(learner, z$mlr.task, z$mlr.rin, measures = z$mlr.measures,
     models = models)
   res = bmr$results[[1]][[1]]
-  
+
   # add error message
   tr.err = unique(res$err.msgs$train)
   pr.err = unique(res$err.msgs$predict)
@@ -233,13 +233,13 @@ runTaskMlr2 = function(task, learner, measures = NULL,  scimark.vector = NULL, m
     pr.msg = NULL
   }
   msg = paste0(tr.msg, pr.msg)
-  
+
   # create run
   run = OpenML::makeOMLRun(task.id = task$task.id,
     error.message = ifelse(length(msg) == 0, NA_character_, msg))
   run$predictions = OpenML:::reformatPredictions(res$pred$data, task)
-  
-  
+
+
   if (!is.null(scimark.vector)) {
     run$scimark.vector = scimark.vector
   }
