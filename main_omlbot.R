@@ -120,7 +120,7 @@ gc();
 
 # Create Plots comparing to random search ------------------------------------------------------------
 
-i = 6
+i = 4
 # Get the saved performances (either partial or full result)
 learner = stri_sub(str = learner.names[i], from = 13)
 files = list.files("defaultLOOCV/save", full.names = TRUE)
