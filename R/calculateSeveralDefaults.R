@@ -15,7 +15,7 @@ searchDefaults = function(surrogates_train, par.set, n.defaults = 10, probs = 0.
   # Compute n.defaults  default parameters iteratively
   # Earlier found defaults influence later performances
   for (j in seq_len(n.defaults)) {
-    if (probs == "cycle") {
+    if (stri_detect_fixed(probs, "cycle")) {
       # Cycle through different results
       cycle.probs = c(0.5, 0.9, 0.1)
 

@@ -47,8 +47,9 @@ surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names
 # Create resampling train/test splits
 rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
 
+
 registerDoMC(20)
-defs.file = stringBuilder("defaultLOOCV", "mean_defaults", learner.names[i])
+defs.file = stringBuilder("defaultLOOCV", "cycle_defaults", learner.names[i])
 # ------------------------------------------------------------------------------------------------
 # Defaults
 # Compute defaults if not yet available
@@ -62,7 +63,7 @@ if (!file.exists(defs.file)) {
       surrogates$surrogates[rin$train.inds[[it]]], # training surrogates (L-1-Out-CV)
       surrogates$param.set, # parameter space to search through
       n.defaults = 10, # Number of defaults we want to find
-      probs = "mean") # Quantile we want to optimize
+      probs = "cycle") # Quantile we want to optimize
     return(defs)
   }
   # Save found defaults as RDS
@@ -120,7 +121,7 @@ gc();
 
 # Create Plots comparing to random search ------------------------------------------------------------
 
-i = 4
+i = 2
 # Get the saved performances (either partial or full result)
 learner = stri_sub(str = learner.names[i], from = 13)
 files = list.files("defaultLOOCV/save", full.names = TRUE)
