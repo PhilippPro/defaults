@@ -121,11 +121,11 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
         lrn = setHyperPars(lrn, "type" = "C-classification")
         defaults$type = "C-classification"
       }
-      # Only use one thread for xbg
-      if (getLearnerPackages(lrn) == "xgboost") {
-        lrn = setHyperPars(lrn, "nthread" = 1L)
-        defaults$nthread = 1L
-      }
+      # # Only use one thread for xbg
+      # if (getLearnerPackages(lrn) == "xgboost") {
+      #   lrn = setHyperPars(lrn, "nthread" = 1L)
+      #   defaults$nthread = 1L
+      # }
 
       # Get Paramset on original scale, drop unused params
       # and make sure they are in the same order as the design
