@@ -25,6 +25,17 @@ All plots indicate results from the learner `r learner.name`.
 
 **Current status: `r round(sum(data$cnt) / (nrow(data) * 36), 3) * 100` \% of results finished.**
 
+### Caveats
+
+- I can create the same plots for Accuracy, and F1 without any big additional effort if required.
+
+- The current analysis contains 36 / 38 datasets for which we have data from the randomBot.
+  I left out two datasets, because they take really long to evaluate (because they are very big).
+
+- The general process of selecting a best configuration using nested CV seems to be decently unstable, at 
+  least in the decision trees, we sometimes get worse by selecting a bigger subset of the learned defaults.
+  This is an interesting resarch subject in itself, but might influence our analysis.
+
 
 ## Average rank 
 
