@@ -38,19 +38,18 @@ stopImplicitCluster()
 
 
 # Forward selection --------------------------------------------------------------------------------
-i = 1 # 1: glmnet, 2: rpart, 4: svm, 6: xgboost
+i = 6 # 1: glmnet, 2: rpart, 4: svm, 6: xgboost
 
 # Read surrogates from Hard Drive
 surrogates = load_surrogates(learner.names[i])
 
 # Create resampling train/test splits
 set.seed(199 + i)
-
 rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
 
 
 registerDoMC(20)
-defs.file = stringBuilder("defaultLOOCV", "cycle_defaults", learner.names[i])
+defs.file = stringBuilder("defaultLOOCV", "Q2_defaults", learner.names[i])
 # ------------------------------------------------------------------------------------------------
 # Defaults
 # Compute defaults if not yet done

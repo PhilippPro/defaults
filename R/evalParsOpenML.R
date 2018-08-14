@@ -28,59 +28,6 @@ evalMBOOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) 
   evalOpenML("mbo", task.ids, lrn, defaults, ps, it, n, overwrite)
 }
 
-#' Evaluate RandomSearch on RandomBotData
-#' # n.rs = number of randomSearch Iters
-#' # reps = number of repetition
-#' # i learner.names[i]
-evalRandomBotData = function(measure = auc, i, n.rs = c(4, 8, 16, 32, 64), reps = 100, overwrite = FALSE) {
-
-  # Create the learner
-  lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE))
-
-  # Make sure we do not recompute stuff: Save results to a file and check if file exists
-  filepath = stringBuilder("defaultLOOCV/save", stri_paste("randomBotData","all", "perf", sep = "_"), lrn$id)
-  if (!file.exists(filepath) | overwrite) {
-    data_task_match = read.csv("oml_data_task.txt", sep = " ")
-    # Get the data into the right format
-    task.data = makeBotTable(measure, learner.names[i], tbl.results, tbl.metaFeatures, tbl.hypPars,
-      lrn.par.sets[[i]]$param.set, data.ids = sort(unique(tbl.results$data_id)),
-      scale_before = TRUE, scaling = "none")
-    # Do different randomSearch iterations
-    td = foreach(n = n.rs, .combine = "bind_rows") %:%
-      # Repeat random search 100 times
-      foreach(reps = seq_len(reps), .combine = "bind_rows") %do% {
-        task.data %>%
-          group_by(data_id, fullName) %>%
-          sample_n(n) %>%
-          arrange(measure.value) %>%
-          filter(row_number() == 1) %>%
-          arrange(data_id) %>%
-          select(measure.value, data_id, fullName) %>%
-          mutate(n = n)
-      }
-    # Compute mean and add metadata
-    td = td %>%
-      group_by(data_id, fullName, n) %>%
-      summarise(measure.value = mean(measure.value))
-    td[mlr:::measureAggrName(measure)] = 1 - td$measure.value
-    res = td %>%
-      mutate(task.id = data_task_match[data_task_match$data.id == data_id, "task.name"]) %>%
-      rename(learner.id = fullName) %>%
-      select(-measure.value)
-    if (unique(res$learner.id) == "mlr.classif.xgboost") {
-      res$learner.id = "classif.xgboost.dummied.tuned"
-    }
-    res$task.id = as.factor(res$task.id)
-    res$search.type = "randomBotData"
-    saveRDS(res, filepath)
-  } else {
-    res = readRDS(filepath)
-  }
-  return(res)
-}
-
-
-
 # Eval Hyperparams using OpenML datasets
 # @param task.ids  Vector of OpenML Task Ids
 # @param lrn Learner
@@ -173,12 +120,63 @@ evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
   return(list(perf = perf, bmr = run$bmr))
 }
 
+#' Evaluate RandomSearch on RandomBotData
+#' # n.rs = number of randomSearch Iters
+#' # reps = number of repetition
+#' # i learner.names[i]
+evalRandomBotData = function(measure = auc, i, n.rs = c(4, 8, 16, 32, 64), reps = 100, overwrite = FALSE) {
+  
+  # Create the learner
+  lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE))
+  
+  # Make sure we do not recompute stuff: Save results to a file and check if file exists
+  filepath = stringBuilder("defaultLOOCV/save", stri_paste("randomBotData","all", "perf", sep = "_"), lrn$id)
+  if (!file.exists(filepath) | overwrite) {
+    data_task_match = read.csv("oml_data_task.txt", sep = " ")
+    # Get the data into the right format
+    task.data = makeBotTable(measure, learner.names[i], tbl.results, tbl.metaFeatures, tbl.hypPars,
+      lrn.par.sets[[i]]$param.set, data.ids = sort(unique(tbl.results$data_id)),
+      scale_before = TRUE, scaling = "none")
+    # Do different randomSearch iterations
+    td = foreach(n = n.rs, .combine = "bind_rows") %:%
+      # Repeat random search 100 times
+      foreach(reps = seq_len(reps), .combine = "bind_rows") %do% {
+        task.data %>%
+          group_by(data_id, fullName) %>%
+          sample_n(n) %>%
+          arrange(measure.value) %>%
+          filter(row_number() == 1) %>%
+          arrange(data_id) %>%
+          select(measure.value, data_id, fullName) %>%
+          mutate(n = n)
+      }
+    # Compute mean and add metadata
+    td = td %>%
+      group_by(data_id, fullName, n) %>%
+      summarise(measure.value = mean(measure.value))
+    td[mlr:::measureAggrName(measure)] = 1 - td$measure.value
+    res = td %>%
+      mutate(task.id = data_task_match[data_task_match$data.id == data_id, "task.name"]) %>%
+      rename(learner.id = fullName) %>%
+      select(-measure.value)
+    if (unique(res$learner.id) == "mlr.classif.xgboost") {
+      res$learner.id = "classif.xgboost.dummied.tuned"
+    }
+    res$task.id = as.factor(res$task.id)
+    res$search.type = "randomBotData"
+    saveRDS(res, filepath)
+  } else {
+    res = readRDS(filepath)
+  }
+  return(res)
+}
+
 # Convert factors to character, eventually filter invalid params
 fixDefaultsForWrapper = function(pars, lrn, ps, check.feasible = TRUE) {
-
+  
   # Convert factor params to character
   pars = data.frame(lapply(pars, function(x) {if (is.factor(x)) x = as.character(x); x}), stringsAsFactors = FALSE)
-
+  
   # Filter invalid params
   if (check.feasible) {
     ps = getParamSet(lrn)
