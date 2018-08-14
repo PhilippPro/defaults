@@ -514,6 +514,11 @@ Source: CRAN
 Version: 0.2.1
 Hash: 88926ad9c43581fd0822a37c8ed09f05
 
+Package: lhs
+Source: CRAN
+Version: 0.16
+Hash: 17cc12c8c22be5754e236857a2db9625
+
 Package: listenv
 Source: CRAN
 Version: 0.7.0
@@ -557,6 +562,13 @@ Version: 2.12.1
 Hash: 24e25d505e0e884e8790761e0641a215
 Requires: BBmisc, ParamHelpers, XML, backports, checkmate, data.table,
     ggplot2, parallelMap, stringi, survival
+
+Package: mlrMBO
+Source: CRAN
+Version: 1.1.2
+Hash: 6cefdd6aefa9439ad25e69f4b416fae7
+Requires: BBmisc, ParamHelpers, backports, checkmate, data.table, lhs,
+    mlr, parallelMap, smoof
 
 Package: munsell
 Source: CRAN

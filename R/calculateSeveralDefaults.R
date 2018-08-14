@@ -52,6 +52,8 @@ makeObjFunction = function(surrogates_train, probs) {
       quantile(parmin, probs = probs)
     } else if (probs == "mean") {
       mean(parmin)
+    } else if (probs == "hodges-lehmann") {
+      0.33 * max(parmin) + 0.67 * mean(parmin)
     }
   }
 

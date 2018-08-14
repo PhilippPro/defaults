@@ -53,7 +53,7 @@ defs.file = stringBuilder("defaultLOOCV", "Q2_defaults", learner.names[i])
 # ------------------------------------------------------------------------------------------------
 # Defaults
 # Compute defaults if not yet done
-# probs : 0.5; mean, cycle
+# probs : 0.5; mean, cycle, hodges-lehmann
 if (!file.exists(defs.file)) {
   # Iterate over ResampleInstance and its indices
   defs = foreach(it = seq_len(rin$desc$iters)) %dorng% {
