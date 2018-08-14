@@ -93,11 +93,12 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
       evalParsOpenML(task, lrn.tune)
     })
     
-    res = do.call("rbind", res$perf)
-    res$search.type = ctrl
-    res$n = n
-    saveRDS(res, filepath)
-    saveRDS(res$bmr, stringBuilder("defaultLOOCV/bmrs", stri_paste(ctrl, n, it, "perf", sep = "_"), lrn$id))
+    resdf = do.call("rbind", extractSubList(res, "perf", simplify = FALSE))
+    resdf$search.type = ctrl
+    resdf$n = n
+    saveRDS(resdf, filepath)
+    saveRDS(extractSubList(res, "bmr", simplify = FALSE),
+      stringBuilder("defaultLOOCV/bmrs", stri_paste(ctrl, n, it, "perf", sep = "_"), lrn$id))
   } else {
     res = readRDS(filepath)
   }
