@@ -1,19 +1,3 @@
-# Eval Hyperparams using OpenML datasets
-# @param task OpenML Task Id | OMLTask
-# @param lrn Learner
-# @param pars Single param Configuration
-evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
-
-  run = runTaskMlr2(task, lrn, measures = list(mlr::auc, mlr::f1))
-
-  # FIXME: Eventually upload the run
-  perf = getBMRAggrPerformances(run$bmr, as.df = TRUE)
-  perf$task.id = as.character(perf$task.id)
-  perf$learner.id = as.character(perf$learner.id)
-
-  return(perf)
-}
-
 evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, aggr.fun = NULL, overwrite = FALSE) {
   defaults = defaults[[it]][seq_len(n), , drop = FALSE]
   if (!(task.ids %in% c("1486", "4134"))) {
@@ -37,6 +21,11 @@ evalRandomSearchOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite 
 evalPackageDefaultOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
   defaults = defaults[[it]]
   evalOpenML("package-default", task.ids, lrn, defaults, ps, it, n, overwrite)
+}
+
+evalMBOOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
+  defaults = defaults[[it]]
+  evalOpenML("mbo", task.ids, lrn, defaults, ps, it, n, overwrite)
 }
 
 #' Evaluate RandomSearch on RandomBotData
@@ -121,12 +110,11 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
         lrn = setHyperPars(lrn, "type" = "C-classification")
         defaults$type = "C-classification"
       }
-      # # Only use one thread for xbg
-      # if (getLearnerPackages(lrn) == "xgboost") {
-      #   lrn = setHyperPars(lrn, "nthread" = 1L)
-      #   defaults$nthread = 1L
-      # }
-
+      # Only use one thread for xbg
+      if (getLearnerPackages(lrn) == "xgboost") {
+        lrn = setHyperPars(lrn, "nthread" = 1L)
+        defaults$nthread = 1L
+      }
       # Get Paramset on original scale, drop unused params
       # and make sure they are in the same order as the design
       lrn.ps = fixParamSetForDesign(defaults, lrn)
@@ -144,6 +132,10 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
         lrn.ps = ps # We want to tune over a nicer param space (with trafos)
         tune.ctrl = makeTuneControlRandom(same.resampling.instance = TRUE, maxit = n)
         lrn.tune = makeTuneWrapper(lrn, inner.rdesc, mlr::auc, par.set = lrn.ps, tune.ctrl)
+      } else if (ctrl == "mbo") {
+        lrn.ps = ps # We want to tune over a nicer param space (with trafos)
+        tune.ctrl = makeTuneControlMBO(same.resampling.instance = TRUE, budget = n)
+        lrn.tune = makeTuneWrapper(lrn, inner.rdesc, mlr::auc, par.set = lrn.ps, tune.ctrl)
       } else if (ctrl == "package-default") {
         if (getLearnerPackages(lrn) == "xgboost") {
           lrn = setHyperPars(lrn, "nrounds" = 100L)
@@ -151,19 +143,35 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
         lrn.tune = lrn
         lrn.tune$id = stri_paste(lrn.tune$id, ".tuned")
       }
-      res = evalParsOpenML(task, lrn.tune)
+      evalParsOpenML(task, lrn.tune)
     })
     
-    res = do.call("rbind", res)
+    res = do.call("rbind", res$perf)
     res$search.type = ctrl
     res$n = n
     saveRDS(res, filepath)
+    saveRDS(res$bmr, stringBuilder("defaultLOOCV/bmrs", stri_paste(ctrl, n, it, "perf", sep = "_"), lrn$id))
   } else {
     res = readRDS(filepath)
   }
   return(res)
 }
 
+# Eval Hyperparams using OpenML datasets
+# @param task OpenML Task Id | OMLTask
+# @param lrn Learner
+# @param pars Single param Configuration
+evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
+  
+  run = runTaskMlr2(task, lrn, measures = list(mlr::auc, mlr::f1))
+  
+  # Extract performances
+  perf = getBMRAggrPerformances(run$bmr, as.df = TRUE)
+  perf$task.id = as.character(perf$task.id)
+  perf$learner.id = as.character(perf$learner.id)
+  
+  return(list(perf = perf, bmr = run$bmr))
+}
 
 # Convert factors to character, eventually filter invalid params
 fixDefaultsForWrapper = function(pars, lrn, ps, check.feasible = TRUE) {
@@ -248,7 +256,6 @@ runTaskMlr2 = function(task, learner, measures = NULL,  scimark.vector = NULL, m
   run = OpenML::makeOMLRun(task.id = task$task.id,
     error.message = ifelse(length(msg) == 0, NA_character_, msg))
   run$predictions = OpenML:::reformatPredictions(res$pred$data, task)
-
 
   if (!is.null(scimark.vector)) {
     run$scimark.vector = scimark.vector

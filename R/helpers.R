@@ -146,7 +146,12 @@ stringBuilder = function(folder, what, learner.name) {
   stri_paste(folder, "/", what, gsub("regr.", "", files[grep(stri_sub(learner.name, from = 5), x = files)]))
 }
 
-
+load_surrogates = function(learner.name) {
+  files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist_classif")]
+  catf("Loading surrogate for learner: %s", learner.name)
+  # Read surrogates from Hard Drive
+  surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.name, from = 5), x = files)]))
+}
 
 
 # -------------------------------------------------------------------------------------------------
