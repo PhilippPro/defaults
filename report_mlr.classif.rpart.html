@@ -129,6 +129,14 @@ $(document).ready(function () {
 <h1>mlr.classif.rpart</h1>
 <p>All plots indicate results from the learner mlr.classif.rpart.</p>
 <p><strong>Current status: 100 % of results finished.</strong></p>
+<div id="caveats" class="section level3">
+<h3>Caveats</h3>
+<ul>
+<li><p>I can create the same plots for Accuracy, and F1 without any big additional effort if required.</p></li>
+<li><p>The current analysis contains 36 / 38 datasets for which we have data from the randomBot. I left out two datasets, because they take really long to evaluate (because they are very big).</p></li>
+<li><p>The general process of selecting a best configuration using nested CV seems to be decently unstable, at least in the decision trees, we sometimes get worse by selecting a bigger subset of the learned defaults. This is an interesting resarch subject in itself, but might influence our analysis.</p></li>
+</ul>
+</div>
 <div id="average-rank" class="section level2">
 <h2>Average rank</h2>
 <p>The following table contains the average rank, mean auc, normalized mean auc and median of auc across n = 36 hold-out datasets. All results have been obtained using 10-fold CV splits from OpenML and 5-fold nested CV for selecting a configuration in the multiple defaults and random-search case.</p>
