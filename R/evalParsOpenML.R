@@ -145,6 +145,9 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
         tune.ctrl = makeTuneControlRandom(same.resampling.instance = TRUE, maxit = n)
         lrn.tune = makeTuneWrapper(lrn, inner.rdesc, mlr::auc, par.set = lrn.ps, tune.ctrl)
       } else if (ctrl == "package-default") {
+        if (getLearnerPackages(lrn) == "xgboost") {
+          lrn = setHyperPars(lrn, "nrounds" = 100L)
+        }
         lrn.tune = lrn
         lrn.tune$id = stri_paste(lrn.tune$id, ".tuned")
       }

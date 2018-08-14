@@ -73,7 +73,7 @@ if (!file.exists(defs.file)) {
 #-------------------------------------------------------------------------------------------------
 # Evaluate found defaults on OOB-Tasks on OpenML
 defs = readRDS(defs.file)
-n.defs = c(2, 4, 6, 8, 10)
+n.defs = c(1, 2, 4, 6, 8, 10)
 def.res = foreach(it = seq_len(rin$desc$iters)) %:%
   foreach(n = n.defs) %dopar% {
     evalDefaultsOpenML(
@@ -139,7 +139,7 @@ for (i__ in c(1, 2, 4, 6)) {
     # Boxplot of the different methods
     p = results[["oob.perf"]] %>%
       filter(search.type != "randomBotData") %>%
-      filter(search.type %in% c("design", "package-defaults", "random")) %>%
+      filter(search.type %in% c("design", "package-default", "random")) %>%
       ggboxplot(., x = "n", y = "auc.test.mean", color = "n", add = "jitter") +
       ggtitle("Performance across all datasets") +
       facet_wrap(~search.type, scales = "free_x"),

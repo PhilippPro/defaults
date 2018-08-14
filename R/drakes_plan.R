@@ -66,22 +66,21 @@ compare_to_nfold_plot = function(lst, meas = "auc.test.mean") {
         mutate(
           auc.def = auc.test.mean,
           acc.def = acc.test.join,
-          f1.def = f1.test.mean
-        ),
+          f1.def = f1.test.mean),
       by = c("task.id", "learner.id")) %>%
     filter(n.x %in% c(2, 4, 8)) %>%
     mutate(
-      delta_auc = auc.test.mean.x - auc.def,
-      delta_acc = acc.test.join.x - acc.def,
-      delta_f1 = f1.test.mean.x - f1.def,
+      delta_auc =  auc.def- auc.test.mean.x,
+      delta_acc = acc.def -acc.test.join.x,
+      delta_f1 = f1.def - f1.test.mean.x,
       multiple = n.y / n.x) %>%
     filter(multiple %in% c(1, 2, 4, 8)) %>%
-    mutate(n = as.factor(n.x))
+    mutate(n = as.factor(n.x), multiple = as.factor(multiple))
   
   delta = switch(meas, "auc.test.mean" = "delta_auc", "acc.test.join" = "delta_acc", "f1.test.mean" = "delta_f1")
   
   # Boxplot Differences
-  ggboxplot(gdata, x = "search.type.x", y = delta, color = "multiple") +
+  ggboxplot(gdata, x = "search.type.y", y = delta, color = "multiple") +
     geom_abline(intercept = 0, slope = 0) +
     facet_grid(~ n) + 
     ggtitle(stri_paste("Performance difference to defaults for ", "auc.test.mean")) +

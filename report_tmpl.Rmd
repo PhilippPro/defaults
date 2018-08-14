@@ -70,7 +70,7 @@ p
 ## Comparison to n-fold randomSearch
 
 Boxplot of n (2, 4, 8) found defaults (design) vs. random search with $n \cdot 1,2,4,8$ times random search.
-Values $> 0$ indicate an improvement of defaults over randomSearch.
+Values $> 0$ indicate an improvement of randomsearch using multiples of n over obtained defaults.
 
 ```{r, echo = FALSE}
 nfold
