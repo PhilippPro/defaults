@@ -38,7 +38,7 @@ stopImplicitCluster()
 
 # Forward selection ----------------------------------------------------------------------------------
 files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist_classif")]
-i = 2
+i = 1
 catf("Learner: %s", learner.names[i])
 set.seed(199 + i)
 
