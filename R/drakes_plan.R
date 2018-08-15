@@ -1,6 +1,6 @@
-get_results_from_folder = function(i) {
+get_results_from_folder = function(i__) {
   # Get the saved performances (either partial or full result)
-  learner = stri_sub(str = learner.names[i], from = 13)
+  learner = stri_sub(str = learner.names[i__], from = 13)
   files = list.files("defaultLOOCV/save", full.names = TRUE)
   files = files[stri_detect_fixed(files , learner)]
   list(oob.perf = do.call("bind_rows", lapply(files, readRDS)) %>%
@@ -13,7 +13,7 @@ preprocess_results = function(lst) {
     filter(search.type != "randomBotData") %>%
     group_by(task.id) %>%
     mutate(
-      rnk = min_rank(desc(auc.test.mean)), 
+      rnk = dense_rank(desc(auc.test.mean)), 
       auc.test.normalized = (auc.test.mean - min(auc.test.mean)) / (max(auc.test.mean) - min(auc.test.mean)))  %>%
     ungroup() %>%
     group_by(search.type, n) %>%
@@ -40,9 +40,9 @@ compare_to_pkg_defaults = function(lst, meas = "auc.test.mean") {
         ),
       by = c("task.id", "learner.id")) %>%
     mutate(
-      delta_auc = auc.test.mean.x - auc.def,
-      delta_acc = acc.test.join.x - acc.def,
-      delta_f1 = f1.test.mean.x - f1.def
+      delta_auc = - (auc.test.mean.x - auc.def),
+      delta_acc = - (acc.test.join.x - acc.def),
+      delta_f1 = - (f1.test.mean.x - f1.def)
     ) %>%
     filter(search.type.x != "package-default") %>%
     mutate(n = as.factor(n.x))

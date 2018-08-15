@@ -137,7 +137,6 @@ learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
 plans = vector("list", 4)
 
 for (i__ in c(1, 2, 4, 6)) {
-  
   plans[[i__]] = drake_plan(
     results = get_results_from_folder(i__),
     
@@ -183,9 +182,11 @@ for (i__ in c(1, 2, 4, 6)) {
   )
 }
 
-for (i__ in c(1, 2, 4, 6)) {
-  make(plans[[i__]])
-}
+
+i__ = 1; make(plans[[i__]])
+i__ = 2; make(plans[[i__]])
+i__ = 3; make(plans[[i__]])
+i__ = 4; make(plans[[i__]])
 
 
 
