@@ -4,19 +4,38 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-
 knitr::opts_chunk$set(echo = TRUE)
-loadd(learner.name)
-loadd(data)
-loadd(data_aggfun)
-loadd(p)
-loadd(g)
-loadd(r)
-loadd(rankplot)
-loadd(nfold)
-loadd(tsneplot)
-```
+# Load the files
+switch(as.character(j),
+  "1" = {
+    loadd(learner.name_1)
+    loadd(results_1)
+    loadd(data_1)
+    loadd(plots_1)
+  },
+  "2" = {
+    loadd(learner.name_2)
+    loadd(results_2)
+    loadd(data_2)
+    loadd(plots_2)
+  },
+  "4" = {
+    loadd(learner.name_4)
+    loadd(results_4)
+    loadd(data_4)
+    loadd(plots_4)
+  },
+  "6" = {
+    loadd(learner.name_6)
+    loadd(results_6)
+    loadd(data_6)
+    loadd(plots_6)
+  })
 
+# Overwrite learner.name = learner.name_1 etc.
+obj = c("learner.name", "results", "data", "plots")
+eval(parse(text = paste0(obj, " = ", obj, "_", j, ";")))
+```
 
 
 # `r learner.name`
@@ -64,7 +83,7 @@ Boxplot of n found defaults (design) vs. package defaults and random search with
 
 
 ```{r, echo = FALSE}
-p
+plots$p
 ```
 
 
@@ -74,7 +93,7 @@ Boxplot of n (2, 4, 8) found defaults (design) vs. random search with $n \cdot 1
 Values $> 0$ indicate an improvement of randomsearch using multiples of n over obtained defaults.
 
 ```{r, echo = FALSE}
-nfold
+plots$nfold
 ```
 
 ## Comparison to randomBotdata
@@ -82,7 +101,7 @@ nfold
 Boxplot of minimum over n = 4, 8, 16, 32, 64 randomly sampled configurations from the randomBotdata.
 
 ```{r, echo = FALSE}
-r
+plots$r
 ```
 
 
@@ -91,7 +110,7 @@ This plot indicates the difference to package defaults measured in AUC.
 Values larger than 0 indicate improvement over package defaults.
 
 ```{r, echo = FALSE, warning=FALSE}
-g
+plots$g
 ```
 
 
@@ -99,7 +118,7 @@ g
 
 Plot containing the ranks of the different elements of the first table
 ```{r, echo = FALSE, warning = FALSE}
-rankplot
+plots$rankplot
 ```
 
 ## Comparing different Aggregation functions:
@@ -110,12 +129,15 @@ rankplot
 
 **default_cycle**: Aggregate cycling through the quantiles (0.7, 0.3 and 0.5)
 
+**hodges-lehmann**: Aggregate using the hodges-lehmann criterion (0.33  max() + 0.66  mean()).
+
 If the following table does not contain differnt **search.types**, this indicates that results have not yet been computed for this learner.
 
 *mn_auc_norm.* is short for mean_auc_normalized (normalized to [0, 1]).
 
 ```{r, echo = FALSE}
-data_aggfun
+preprocess_results(results) %>%
+  filter(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann"))
 ```
 
 
@@ -125,5 +147,5 @@ Plot breaking down the parameter space to two dimensions using TSNE.
 The different iters refer to different Leave-One-Out Splits of the dataset.
 
 ```{r, echo = FALSE}
-tsneplot
+plots$tsneplot
 ```
