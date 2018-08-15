@@ -85,6 +85,7 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
       } else if (ctrl == "mbo") {
         lrn.ps = ps # We want to tune over a nicer param space (with trafos)
         tune.ctrl = makeTuneControlMBO(same.resampling.instance = TRUE, budget = n)
+        tune.ctrl = setMBOControlTermination(tune.ctrl, iters = n)
         lrn.tune = makeTuneWrapper(lrn, inner.rdesc, mlr::auc, par.set = lrn.ps, tune.ctrl)
       } else if (ctrl == "package-default") {
         if (getLearnerPackages(lrn) == "xgboost") {
@@ -95,7 +96,7 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
       }
       evalParsOpenML(task, lrn.tune)
     })
-    
+
     resdf = do.call("rbind", extractSubList(res, "perf", simplify = FALSE))
     resdf$search.type = ctrl
     resdf$n = n
@@ -113,14 +114,14 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
 # @param lrn Learner
 # @param pars Single param Configuration
 evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
-  
+
   run = runTaskMlr2(task, lrn, measures = list(mlr::auc, mlr::f1))
-  
+
   # Extract performances
   perf = getBMRAggrPerformances(run$bmr, as.df = TRUE)
   perf$task.id = as.character(perf$task.id)
   perf$learner.id = as.character(perf$learner.id)
-  
+
   return(list(perf = perf, bmr = run$bmr))
 }
 
@@ -129,10 +130,10 @@ evalParsOpenML = function(task, lrn, fun = runTaskMlr2) {
 #' # reps = number of repetition
 #' # i learner.names[i]
 evalRandomBotData = function(measure = auc, i, n.rs = c(4, 8, 16, 32, 64), reps = 100, overwrite = FALSE) {
-  
+
   # Create the learner
   lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE))
-  
+
   # Make sure we do not recompute stuff: Save results to a file and check if file exists
   filepath = stringBuilder("defaultLOOCV/save", stri_paste("randomBotData","all", "perf", sep = "_"), lrn$id)
   if (!file.exists(filepath) | overwrite) {
@@ -177,10 +178,10 @@ evalRandomBotData = function(measure = auc, i, n.rs = c(4, 8, 16, 32, 64), reps 
 
 # Convert factors to character, eventually filter invalid params
 fixDefaultsForWrapper = function(pars, lrn, ps, check.feasible = TRUE) {
-  
+
   # Convert factor params to character
   pars = data.frame(lapply(pars, function(x) {if (is.factor(x)) x = as.character(x); x}), stringsAsFactors = FALSE)
-  
+
   # Filter invalid params
   if (check.feasible) {
     ps = getParamSet(lrn)
