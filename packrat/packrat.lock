@@ -524,6 +524,12 @@ Source: CRAN
 Version: 0.7.0
 Hash: f5e0d09f4e42d749ae0f893cff1817b6
 
+Package: lubridate
+Source: CRAN
+Version: 1.7.4
+Hash: 4a1a31b2e8377b4ba20e117d4a1b8b72
+Requires: Rcpp, stringr
+
 Package: magrittr
 Source: CRAN
 Version: 1.5
@@ -709,6 +715,11 @@ Version: 0.2.5
 Hash: 8b0c16db10c7e20b70cd37779a673a8b
 Requires: magrittr, rlang, tibble
 
+Package: randomForest
+Source: CRAN
+Version: 4.6-14
+Hash: e906cd13baafae063318f46d86c1d26d
+
 Package: ranger
 Source: CRAN
 Version: 0.10.1
@@ -851,6 +862,12 @@ Version: 0.6
 Hash: a149d4e6a2f7d6422e063a19cca52bb9
 Requires: xfun
 
+Package: tweenr
+Source: CRAN
+Version: 0.1.5
+Hash: 57cac3771bee339dd131d437af9fe917
+Requires: Rcpp
+
 Package: txtq
 Source: CRAN
 Version: 0.0.4
@@ -862,10 +879,22 @@ Source: CRAN
 Version: 1.1.4
 Hash: f3f97ce59092abc8ed3fd098a59e236c
 
+Package: viridis
+Source: CRAN
+Version: 0.5.1
+Hash: 39edaec2078b4fc928afb73cc1ce6625
+Requires: ggplot2, gridExtra, viridisLite
+
 Package: viridisLite
 Source: CRAN
 Version: 0.3.0
 Hash: 78bb072c4f9e729a283d4c40ec93f9c6
+
+Package: visNetwork
+Source: CRAN
+Version: 2.0.4
+Hash: b2a4440593cfd5d858cee5fdbc0fc4f0
+Requires: htmltools, htmlwidgets, jsonlite, magrittr
 
 Package: whisker
 Source: CRAN
