@@ -25,7 +25,7 @@ learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
 source("https://raw.githubusercontent.com/pfistfl/mlr-extralearner/master/R/RLearner_regr_fixcubist.R")
 surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 20)
 
-registerDoMC(19)
+registerDoMC(20)
 trainSaveSurrogates(surrogate.mlr.lrn, lrn.par.sets, learner.names)
 stopImplicitCluster()
 
@@ -38,7 +38,7 @@ stopImplicitCluster()
 
 
 # Forward selection --------------------------------------------------------------------------------
-i = 6 # 1: glmnet, 2: rpart, 4: svm, 6: xgboost
+i = 2 # 1: glmnet, 2: rpart, 4: svm, 6: xgboost
 
 # Read surrogates from Hard Drive
 surrogates = load_surrogates(learner.names[i])
@@ -49,7 +49,7 @@ rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(sur
 
 
 registerDoMC(20)
-defs.file = stringBuilder("defaultLOOCV", "Q2_defaults", learner.names[i])
+defs.file = stringBuilder("defaultLOOCV", "hodges-lehmann", learner.names[i])
 # ------------------------------------------------------------------------------------------------
 # Defaults
 # Compute defaults if not yet done
@@ -127,67 +127,6 @@ rb.res = evalRandomBotData(measure = mlr::auc, i, n.rs = c(4, 8, 16, 32, 64), re
 stopImplicitCluster()
 saveRDS(list("oob.perf" = oml.res), stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i]))
 gc();
-
-
-
-
-# Create Reports -----------------------------------------------------------------------------------
-lrn.par.sets = getLearnerParSets()
-learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
-plans = vector("list", 4)
-
-for (i__ in c(1, 2, 4, 6)) {
-  plans[[i__]] = drake_plan(
-    results = get_results_from_folder(i__),
-    
-    data = preprocess_results(results) %>%
-      filter(search.type %in% c("design", "package-defaults", "random")),
-    
-    data_aggfun = preprocess_results(results) %>%
-      filter(search.type %in% c("design", "defaults_mean", "defaults_cycle")),
-    
-    # Boxplot of the different methods
-    p = results[["oob.perf"]] %>%
-      filter(search.type != "randomBotData") %>%
-      filter(search.type %in% c("design", "package-default", "random")) %>%
-      ggboxplot(., x = "n", y = "auc.test.mean", color = "n", add = "jitter") +
-      ggtitle("Performance across all datasets") +
-      facet_wrap(~search.type, scales = "free_x"),
-    
-    # Boxplot of randomBotData
-    r = results[["oob.perf"]] %>%
-      filter(search.type == "randomBotData") %>%
-      ggboxplot(., x = "n", y = "auc.test.mean", color = "n", add = "jitter") +
-      ggtitle("Performance across all datasets") +
-      facet_wrap(~search.type, scales = "free_x"),
-    
-    # Comparison to package defaults
-    g = compare_to_pkg_defaults(results), 
-    
-    # Comparison to n-fold random search
-    nfold = compare_to_nfold_plot(results),
-    
-    # Plot ranks and mean of means etc.
-    rankplot = make_rankplot(data),
-    
-    tsneplot = make_tsneplot(i__),
-    
-    learner.name = paste0(learner.names[i__]), 
-    
-    target.file = paste0("report_", learner.names[i__], ".html"),
-    
-    report = create_report(i__),
-    
-    strings_in_dots = "literals"
-  )
-}
-
-
-i__ = 1; make(plans[[i__]])
-i__ = 2; make(plans[[i__]])
-i__ = 3; make(plans[[i__]])
-i__ = 4; make(plans[[i__]])
-
 
 
 #--------------------------------------------------------------------------------------------------

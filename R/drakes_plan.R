@@ -1,6 +1,45 @@
-get_results_from_folder = function(i__) {
+create_report = function(learner.name, data, j) {
+  targetfile = paste0("report_", learner.name, ".html")
+  rmarkdown::render(
+    knitr_in("report_tmpl.Rmd"),
+    output_file = file_out(targetfile),
+    quiet = TRUE, params = list(j = j))
+}
+
+make_plots = function(results, data, j) {
+  # Boxplot of the different methods
+  p = results[["oob.perf"]] %>%
+    filter(search.type != "randomBotData") %>%
+    filter(search.type %in% c("design", "package-default", "random")) %>%
+    ggboxplot(., x = "n", y = "auc.test.mean", color = "n", add = "jitter") +
+    ggtitle("Performance across all datasets") +
+    facet_wrap(~search.type, scales = "free_x")
+  
+  # Boxplot of randomBotData
+  r = results[["oob.perf"]] %>%
+    filter(search.type == "randomBotData") %>%
+    ggboxplot(., x = "n", y = "auc.test.mean", color = "n", add = "jitter") +
+    ggtitle("Performance across all datasets") +
+    facet_wrap(~search.type, scales = "free_x")
+  
+  # Comparison to package defaults
+  g = compare_to_pkg_defaults(results) 
+  
+  # Comparison to n-fold random search
+  nfold = compare_to_nfold_plot(results)
+  
+  # Plot ranks and mean of means etc.
+  rankplot = make_rankplot(data)
+
+  tsneplot = make_tsneplot(j)
+  
+  return(list(p = p, r = r, g = g, nfold = nfold, rankplot = rankplot, tsneplot = tsneplot))
+  
+}
+
+get_results_from_folder = function(j) {
   # Get the saved performances (either partial or full result)
-  learner = stri_sub(str = learner.names[i__], from = 13)
+  learner = stri_sub(str = learner.names[j], from = 13)
   files = list.files("defaultLOOCV/save", full.names = TRUE)
   files = files[stri_detect_fixed(files , learner)]
   list(oob.perf = do.call("bind_rows", lapply(files, readRDS)) %>%
@@ -108,20 +147,13 @@ make_rankplot = function(data) {
     facet_wrap(~measure, scales = "free")
 }
 
-create_report = function(i) {
-  rmarkdown::render(
-    knitr_in("report_tmpl.Rmd"),
-    output_file = file_out(readd(target.file)),
-    quiet = TRUE)
-}
-
-make_tsneplot = function(i) {
+make_tsneplot = function(j) {
   # Eval defaults using tsne
-  defs.file = stringBuilder("defaultLOOCV", "Q2_defaults", learner.names[i])
+  defs.file = stringBuilder("defaultLOOCV", "Q2_defaults", learner.names[j])
   defs = readRDS(defs.file)
   
   library(Rtsne)
-  set.seed(2999 + i)
+  set.seed(2999 + j)
   defdf = do.call("bind_rows", list(defs$defaults, .id = "iter"))
   
   nums = sapply(defdf, is.numeric)

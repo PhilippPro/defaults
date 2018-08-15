@@ -5,7 +5,7 @@ evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, aggr.fun = NUL
       defs.aggr.fun = switch(aggr.fun,
         "mean" = "defaults_mean",
         "cycle" = "defaults_cycle",
-        "lehmann-hodges" = "lehmann-hodges"
+        "hodges-lehmann" = "hodges-lehmann"
       )
     } else {
       defs.aggr.fun = "design" # Median
@@ -37,6 +37,7 @@ evalMBOOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) 
 evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
 
   filepath = stringBuilder("defaultLOOCV/save", stri_paste(ctrl, n, it, "perf", sep = "_"), lrn$id)
+  print(filepath)
   # For now we skip task.id %in% c("1486") as they are very big
   if (!file.exists(filepath) | overwrite) {
     # The names of the surrogates are "OpenML Data Id's". We need "OpenML Task Id's.
@@ -74,7 +75,7 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
       if (getLearnerPackages(lrn) == "xgboost") {
         lrn = makeDummyFeaturesWrapper(lrn)
       }
-      if (ctrl %in% c("design", "defaults_mean", "defaults_cycle")) {
+      if (ctrl %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann")) {
         tune.ctrl = makeTuneControlDesign(same.resampling.instance = TRUE, design = defaults)
         lrn.tune = makeTuneWrapper(lrn, inner.rdesc, mlr::auc, par.set = lrn.ps, tune.ctrl)
       } else if (ctrl == "random") {
