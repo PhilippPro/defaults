@@ -85,7 +85,7 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
       } else if (ctrl == "mbo") {
         lrn.ps = ps # We want to tune over a nicer param space (with trafos)
         tune.ctrl = makeTuneControlMBO(same.resampling.instance = TRUE, budget = n)
-        tune.ctrl = setMBOControlTermination(tune.ctrl, iters = n)
+        tune.ctrl =  mlrMBO::setMBOControlTermination(tune.ctrl, iters = n)
         lrn.tune = makeTuneWrapper(lrn, inner.rdesc, mlr::auc, par.set = lrn.ps, tune.ctrl)
       } else if (ctrl == "package-default") {
         if (getLearnerPackages(lrn) == "xgboost") {
