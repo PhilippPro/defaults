@@ -1,10 +1,12 @@
 evalDefaultsOpenML = function(task.ids, lrn, defaults, ps, it, n, aggr.fun = NULL, overwrite = FALSE) {
   defaults = defaults[[it]][seq_len(n), , drop = FALSE]
   if (!(task.ids %in% c("1486", "4134"))) {
-    if (!is.null(defs$aggr.fun)) {
-      defs.aggr.fun = switch(defs$aggr.fun,
+    if (!is.null(aggr.fun)) {
+      defs.aggr.fun = switch(aggr.fun,
         "mean" = "defaults_mean",
-        "cycle" = "defaults_cycle")
+        "cycle" = "defaults_cycle",
+        "lehmann-hodges" = "lehmann-hodges"
+      )
     } else {
       defs.aggr.fun = "design" # Median
     }
