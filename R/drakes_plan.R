@@ -47,8 +47,8 @@ get_results_from_folder = function(j) {
       filter(!(task.id %in% c("nomao", "Bioresponse")))) # nomao | Bioresponse take really long
 }
 
-preprocess_results = function(lst) {
-  lst$oob.perf %>%
+preprocess_results = function(oob.perf) {
+  oob.perf %>%
     filter(search.type != "randomBotData") %>%
     group_by(task.id) %>%
     mutate(

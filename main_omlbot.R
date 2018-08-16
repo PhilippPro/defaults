@@ -49,6 +49,7 @@ rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(sur
 
 
 registerDoMC(20)
+# default types: "Q2_defaults", "mean_defaults", "cycle_defaults", "hodges-lehmann", 
 defs.file = stringBuilder("defaultLOOCV", "hodges-lehmann", learner.names[i])
 # ------------------------------------------------------------------------------------------------
 # Defaults

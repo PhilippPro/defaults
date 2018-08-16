@@ -136,8 +136,26 @@ If the following table does not contain differnt **search.types**, this indicate
 *mn_auc_norm.* is short for mean_auc_normalized (normalized to [0, 1]).
 
 ```{r, echo = FALSE}
-preprocess_results(results) %>%
+preprocess_results(results$oob.perf) %>%
   filter(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann"))
+```
+
+###  Overall means for different search.types
+
+```{r, echo = FALSE}
+preprocess_results(results$oob.perf) %>%
+  filter(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann")) %>%
+  group_by(search.type) %>%
+  summarize(mean(mean_rank_auc), mean(mean_auc), mean(mn_auc_norm.), mean(median_auc))
+```
+
+### Overall means for different n
+
+```{r, echo = FALSE}
+preprocess_results(results$oob.perf) %>%
+  filter(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann")) %>%
+  group_by(n) %>%
+  summarize(mean(mean_rank_auc), mean(mean_auc), mean(mn_auc_norm.), mean(median_auc))
 ```
 
 

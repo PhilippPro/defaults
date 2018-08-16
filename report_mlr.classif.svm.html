@@ -142,7 +142,7 @@ $(document).ready(function () {
 <p>The following table contains the average rank, mean auc, normalized mean auc and median of auc across n = 36 hold-out datasets. All results have been obtained using 10-fold CV splits from OpenML and 5-fold nested CV for selecting a configuration in the multiple defaults and random-search case.</p>
 <p>Attention has been given to the <strong>n</strong> column, as <span class="math inline">\(n &lt; 36\)</span> indicates missing results</p>
 <pre><code>## # A tibble: 13 x 8
-## # Groups:   search.type [3]
+## # Groups:   search.type [?]
 ##    search.type      n mean_rank_auc mean_auc mn_auc_norm. median_auc   cnt
 ##    &lt;chr&gt;        &lt;dbl&gt;         &lt;dbl&gt;    &lt;dbl&gt;        &lt;dbl&gt;      &lt;dbl&gt; &lt;int&gt;
 ##  1 design           1          4.38    0.897        0.691      0.898     8
@@ -197,6 +197,17 @@ $(document).ready(function () {
 <p><em>mn_auc_norm.</em> is short for mean_auc_normalized (normalized to [0, 1]).</p>
 <pre><code>## # A tibble: 6 x 8
 ## # Groups:   search.type [1]
+##   search.type     n mean_rank_auc mean_auc mn_auc_norm. median_auc   cnt
+##   &lt;chr&gt;       &lt;dbl&gt;         &lt;dbl&gt;    &lt;dbl&gt;        &lt;dbl&gt;      &lt;dbl&gt; &lt;int&gt;
+## 1 design          1          4.38    0.897        0.691      0.898     8
+## 2 design          2          2.52    0.877      NaN          0.892    21
+## 3 design          4          2.82    0.883        0.866      0.904    11
+## 4 design          6          3.08    0.873        0.779      0.892    13
+## 5 design          8          2.73    0.918      NaN          0.921    11
+## 6 design         10          2.73    0.919      NaN          0.960    11
+## # ... with 1 more variable: cnt_na &lt;int&gt;</code></pre>
+<pre><code>## # A tibble: 6 x 8
+## # Groups:   n [6]
 ##   search.type     n mean_rank_auc mean_auc mn_auc_norm. median_auc   cnt
 ##   &lt;chr&gt;       &lt;dbl&gt;         &lt;dbl&gt;    &lt;dbl&gt;        &lt;dbl&gt;      &lt;dbl&gt; &lt;int&gt;
 ## 1 design          1          4.38    0.897        0.691      0.898     8
