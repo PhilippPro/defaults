@@ -8,7 +8,7 @@ create_report = function(learner.name, data, j) {
 
 make_plots = function(results, data, j) {
   # Boxplot of the different methods
-  p = results[["oob.perf"]] %>%
+  p = results %>%
     filter(search.type != "randomBotData") %>%
     filter(search.type %in% c("design", "package-default", "random")) %>%
     ggboxplot(., x = "n", y = "auc.test.mean", color = "n", add = "jitter") +
@@ -16,7 +16,7 @@ make_plots = function(results, data, j) {
     facet_wrap(~search.type, scales = "free_x")
   
   # Boxplot of randomBotData
-  r = results[["oob.perf"]] %>%
+  r = results %>%
     filter(search.type == "randomBotData") %>%
     ggboxplot(., x = "n", y = "auc.test.mean", color = "n", add = "jitter") +
     ggtitle("Performance across all datasets") +
@@ -37,14 +37,22 @@ make_plots = function(results, data, j) {
   
 }
 
-get_results_from_folder = function(j) {
+update_all_results = function() {
+  files = list.files("defaultLOOCV/save", full.names = TRUE)
+  lst = list(oob.perf = do.call("bind_rows", lapply(files, readRDS)))
+  saveRDS(lst, "defaultLOOCV/full_results.Rds")
+}
+
+
+get_results_from_folder = function(j, data_in) {
   # Get the saved performances (either partial or full result)
   learner = stri_sub(str = learner.names[j], from = 13)
   files = list.files("defaultLOOCV/save", full.names = TRUE)
   files = files[stri_detect_fixed(files , learner)]
-  list(oob.perf = do.call("bind_rows", lapply(files, readRDS)) %>%
-      filter(stri_detect_fixed(learner.id , learner)) %>%
-      filter(!(task.id %in% c("nomao", "Bioresponse")))) # nomao | Bioresponse take really long
+  do.call("bind_rows", lapply(files, readRDS)) %>%
+    filter(stri_detect_fixed(learner.id , learner)) %>%
+    filter(!(task.id %in% c("nomao", "Bioresponse"))) # nomao | Bioresponse take really long
+  
 }
 
 preprocess_results = function(oob.perf) {
@@ -65,12 +73,12 @@ preprocess_results = function(oob.perf) {
       cnt_na = sum(is.na(auc.test.mean)))
 }
 
-compare_to_pkg_defaults = function(lst, meas = "auc.test.mean") {
+compare_to_pkg_defaults = function(oob.perf, meas = "auc.test.mean") {
   # Boxplot comparing to package default
-  gdata = lst$oob.perf %>% 
+  gdata = oob.perf %>% 
     filter(search.type %in% c("design", "package-defaults", "random")) %>%
     filter(search.type != "randomBotData") %>%
-    left_join(lst$oob.perf %>%
+    left_join(oob.perf %>%
         filter(search.type == "package-default") %>%
         mutate(
           auc.def = auc.test.mean,
@@ -96,11 +104,11 @@ compare_to_pkg_defaults = function(lst, meas = "auc.test.mean") {
     xlab("Search.type")
 }
 
-compare_to_nfold_plot = function(lst, meas = "auc.test.mean") {
+compare_to_nfold_plot = function(oob.perf, meas = "auc.test.mean") {
   # Boxplot comparing to package default
-  gdata = lst$oob.perf %>%
+  gdata = oob.perf %>%
     filter(search.type == "design") %>%
-    left_join(lst$oob.perf %>%
+    left_join(oob.perf %>%
         filter(search.type == "random") %>%
         mutate(
           auc.def = auc.test.mean,
@@ -178,7 +186,7 @@ make_tsneplot = function(j) {
 
 compare_defaults_random_multiples = function(perfs) {
   # How long do I need to search to beat defaults
-  perfs = lst$oob.perf %>% filter(search.type == "random") %>%
+  perfs = lst %>% filter(search.type == "random") %>%
     left_join(lst$oob.perf %>% filter(search.type == "design"), suffix = c(".random", ".default"), by = c("task.id")) %>%
     group_by(task.id) %>%
     mutate(delta_auc = auc.test.mean.random - auc.test.mean.default) %>%

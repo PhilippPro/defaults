@@ -26,6 +26,11 @@ Version: 0.4
 Hash: a6e844446350a7128c734516fa8215e3
 Requires: crosstalk, htmltools, htmlwidgets, magrittr
 
+Package: DiceKriging
+Source: CRAN
+Version: 1.5.5
+Hash: 6dee0623ef5b6c82740a39964ba615e1
+
 Package: OpenML
 Source: CRAN
 Version: 1.8
@@ -486,6 +491,11 @@ Source: CRAN
 Version: 1.5
 Hash: 9c51936d8dd00b2f1d4fe9d10499694c
 
+Package: kernlab
+Source: CRAN
+Version: 0.9-27
+Hash: abac41845cc013d0cc7ed2d249a390bf
+
 Package: kknn
 Source: CRAN
 Version: 1.3.1
@@ -747,6 +757,11 @@ Source: CRAN
 Version: 1.4.3
 Hash: a08472524968be4e233b4c8d0ae5aef1
 Requires: Rcpp, plyr, stringr
+
+Package: rgenoud
+Source: CRAN
+Version: 5.8-2.0
+Hash: b866a38993eabac75acaace6a0d44dd5
 
 Package: rlang
 Source: CRAN

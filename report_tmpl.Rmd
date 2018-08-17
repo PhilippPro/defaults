@@ -6,31 +6,22 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 # Load the files
-switch(as.character(j),
-  "1" = {
-    loadd(learner.name_1)
-    loadd(results_1)
-    loadd(data_1)
-    loadd(plots_1)
-  },
-  "2" = {
-    loadd(learner.name_2)
-    loadd(results_2)
-    loadd(data_2)
-    loadd(plots_2)
-  },
-  "4" = {
-    loadd(learner.name_4)
-    loadd(results_4)
-    loadd(data_4)
-    loadd(plots_4)
-  },
-  "6" = {
-    loadd(learner.name_6)
-    loadd(results_6)
-    loadd(data_6)
-    loadd(plots_6)
-  })
+loadd(learner.name_1)
+loadd(results_1)
+loadd(data_1)
+loadd(plots_1)
+loadd(learner.name_2)
+loadd(results_2)
+loadd(data_2)
+loadd(plots_2)
+loadd(learner.name_4)
+loadd(results_4)
+loadd(data_4)
+loadd(plots_4)
+loadd(learner.name_6)
+loadd(results_6)
+loadd(data_6)
+loadd(plots_6)
 
 # Overwrite learner.name = learner.name_1 etc.
 obj = c("learner.name", "results", "data", "plots")
@@ -136,26 +127,29 @@ If the following table does not contain differnt **search.types**, this indicate
 *mn_auc_norm.* is short for mean_auc_normalized (normalized to [0, 1]).
 
 ```{r, echo = FALSE}
-preprocess_results(results$oob.perf) %>%
-  filter(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann"))
+preprocess_results(results) %>%
+  filter(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann")) %>%
+  print.data.frame()
 ```
 
 ###  Overall means for different search.types
 
 ```{r, echo = FALSE}
-preprocess_results(results$oob.perf) %>%
+preprocess_results(results) %>%
   filter(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann")) %>%
   group_by(search.type) %>%
-  summarize(mean(mean_rank_auc), mean(mean_auc), mean(mn_auc_norm.), mean(median_auc))
+  summarize(mean_rank_auc = mean(mean_rank_auc), mean_auc = mean(mean_auc),
+    mean_auc_norm. =  mean(mn_auc_norm.), mean_med_auc = mean(median_auc))
 ```
 
 ### Overall means for different n
 
 ```{r, echo = FALSE}
-preprocess_results(results$oob.perf) %>%
+preprocess_results(results) %>%
   filter(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann")) %>%
   group_by(n) %>%
-  summarize(mean(mean_rank_auc), mean(mean_auc), mean(mn_auc_norm.), mean(median_auc))
+    summarize(mean_rank_auc = mean(mean_rank_auc), mean_auc = mean(mean_auc),
+      mean_auc_norm. =  mean(mn_auc_norm.), mean_med_auc = mean(median_auc))
 ```
 
 

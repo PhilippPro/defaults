@@ -46,15 +46,18 @@ getLearnerParSets = function(){
   lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.xgboost", predict.type = "prob"), 
     param.set = makeParamSet(
       makeIntegerParam("nrounds", lower = 1, upper = 5000), 
-      makeNumericParam("eta", lower = -10, upper = 0, trafo = function(x) 2^x),
-      makeNumericParam("subsample",lower = 0.1, upper = 1),
       makeDiscreteParam("booster", values = c("gbtree", "gblinear")),
+      makeNumericParam("eta", lower = -10, upper = 0, trafo = function(x) 2^x),
+      makeNumericParam("subsample",lower = 0.1, upper = 1, requires = quote(booster == "gbtree")),
       makeIntegerParam("max_depth", lower = 1, upper = 15, requires = quote(booster == "gbtree")),
-      makeNumericParam("min_child_weight", lower = 0, upper = 7, requires = quote(booster == "gbtree"), trafo = function(x) 2^x),
+      makeNumericParam("min_child_weight", lower = 0, upper = 7, requires = quote(booster == "gbtree"),
+        trafo = function(x) 2^x),
       makeNumericParam("colsample_bytree", lower = 0, upper = 1, requires = quote(booster == "gbtree")),
       makeNumericParam("colsample_bylevel", lower = 0, upper = 1, requires = quote(booster == "gbtree")),
-      makeNumericParam("lambda", lower = -10, upper = 10, trafo = function(x) 2^x),
-      makeNumericParam("alpha", lower = -10, upper = 10, trafo = function(x) 2^x)),
+      makeNumericParam("lambda", lower = -10, upper = 10, trafo = function(x) 2^x,
+        requires = quote(booster == "gblinear")),
+      makeNumericParam("alpha", lower = -10, upper = 10, trafo = function(x) 2^x,
+        requires = quote(booster == "gblinear"))),
     lrn.ps.sets = lrn.par.set)
   
   return(lrn.par.set)
