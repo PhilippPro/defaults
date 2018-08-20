@@ -87,9 +87,9 @@ compare_to_pkg_defaults = function(oob.perf, meas = "auc.test.mean") {
         ),
       by = c("task.id", "learner.id")) %>%
     mutate(
-      delta_auc = - (auc.test.mean.x - auc.def),
-      delta_acc = - (acc.test.join.x - acc.def),
-      delta_f1 = - (f1.test.mean.x - f1.def)
+      delta_auc = (auc.test.mean.x - auc.def),
+      delta_acc = (acc.test.join.x - acc.def),
+      delta_f1 = (f1.test.mean.x - f1.def)
     ) %>%
     filter(search.type.x != "package-default") %>%
     mutate(n = as.factor(n.x))
