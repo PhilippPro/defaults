@@ -53,6 +53,19 @@ make(plan)
 update_all_results()
 df = readRDS("defaultLOOCV/full_results.Rds")
 
+list.files("defaultLOOCV/save/", full.names = TRUE) %>%
+  as.data.frame(x = .) %>%
+  rename(file = ".") %>%
+  filter(stri_detect_fixed(file, "svm"), stri_detect_fixed(file, "random_")) %>%
+  pull(file) %>% as.character() %>%
+  lapply(., readRDS) %>%
+  do.call("bind_rows", .) %>%
+  group_by(learner.id, n) %>%
+  tally()
+  
+
+
+
 df$oob.perf %>%
   filter(search.type != "randomBotData") %>%
   filter(learner.id == "classif.xgboost.dummied.tuned") %>%
@@ -65,7 +78,8 @@ df$oob.perf %>%
     mean_auc = mean(auc.test.mean),
     median_auc = median(auc.test.mean),
     cnt = n()) %>%
-  arrange(desc(mean_auc))
+  arrange(desc(cnt, n)) %>%
+  print.data.frame(.)
   
 
 rpartdf = df$oob.perf %>%
@@ -97,19 +111,6 @@ ggsave("../paper_2018_multiple_defaults/figures/auc_search_type_comparison.pdf",
   plot = p1/p2, scale = 1.5, height = 4, width = 5)
 
 
-df$oob.perf %>%
-  filter(search.type != "randomBotData") %>%
-  filter(learner.id == "classif.xgboost.dummied.tuned") %>%
-  filter(!(task.id %in% c("nomao", "Bioresponse"))) %>%
-  group_by(learner.id, task.id) %>%
-  mutate(rnk = dense_rank(auc.test.mean)) %>%
-  group_by(learner.id, search.type, n) %>%
-  summarize(
-    rnk = mean(rnk),
-    mean_auc = mean(auc.test.mean),
-    median_auc = median(auc.test.mean),
-    cnt = n()) %>%
-  arrange(desc(mean_auc))
 
 df$oob.perf %>%
   filter(search.type != "randomBotData") %>%
@@ -136,6 +137,30 @@ df$oob.perf %>%
   mutate(search.type = ifelse(search.type ==  "package-default", "package", search.type)) -> xgbdf
 
 
+df$oob.perf %>%
+  filter(search.type != "randomBotData") %>%
+  filter(learner.id == "classif.glmnet.tuned") %>%
+  filter(!(task.id %in% c("nomao", "Bioresponse"))) %>%
+  filter(!(search.type == "random" & n <= 8)) %>%
+  filter(!(search.type == "design" & n <= 4)) %>%
+  group_by(learner.id, task.id) %>%
+  mutate(rnk = dense_rank(desc(auc.test.mean))) %>%
+  group_by(learner.id, search.type, n) %>%
+  summarize(
+    mean_rank_auc = mean(rnk),
+    mean_auc = mean(auc.test.mean),
+    median_auc = median(auc.test.mean),
+    cnt = n()) %>%
+  arrange(desc(mean_auc)) %>%
+  rename(
+    mean.rank.auc = mean_rank_auc,
+    mean.auc = mean_auc,
+    median.auc = median_auc
+  )  %>%
+  ungroup() %>% 
+  mutate(search.type = ifelse(search.type ==  "design", "mult.defaults", search.type)) %>%
+  mutate(search.type = ifelse(search.type ==  "package-default", "package", search.type)) -> glmnetdf
+
 library(knitr)
 library(kableExtra)
 
@@ -149,7 +174,7 @@ rpartdf = df$oob.perf %>%
   filter(!(search.type == "random" & n <= 8)) %>%
   filter(!(search.type == "hodges-lehmann" & n <= 4)) %>%
   group_by(learner.id, task.id) %>%
-  mutate(rnk = dense_rank(auc.test.mean)) %>%
+  mutate(rnk = dense_rank(desc(auc.test.mean))) %>%
   group_by(learner.id, search.type, n) %>%
   summarize(
     mean_rank_auc = mean(rnk),
@@ -170,10 +195,13 @@ make_table = function(df) {
   df %>% select(-cnt, -learner.id) %>%
   unite(search.type_n, search.type, n, sep = ".") %>%
   gather(measure, value, mean.rank.auc:median.auc, -search.type_n) %>%
-  spread(key = search.type_n, value) -> rpart.table
+  spread(key = search.type_n, value) %>%
+  rename(package = package.1) -> rpart.table
     
-  rpart.table = rpart.table[c(2, 1, 3), c(1,6, 4, 5, 3,7, 8, 9, 2)]
-
+  if(ncol(rpart.table) == 9)
+    rpart.table = rpart.table[c(2, 1, 3), c(1,6, 4, 5, 3,7, 8, 9, 2)]
+  if(ncol(rpart.table) == 8)
+    rpart.table = rpart.table[c(2, 1, 3), c(1,6, 4, 5, 3,7, 8, 2)]
   # Best values
   opt = c(apply(rpart.table[1, -1], 1, min), apply(rpart.table[2:3, -1], 1, max))
 
@@ -192,3 +220,5 @@ make_table = function(df) {
   
 make_table(rpartdf)
 make_table(xgbdf)
+make_table(glmnetdf)
+
