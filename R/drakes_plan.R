@@ -200,7 +200,6 @@ compare_defaults_random_multiples = function(perfs) {
       tie = sum(delta_auc == 0),
       rnd.better = sum(delta_auc > 0))
   
-  p1 = ggplot(perfs, aes(x = x.random, y = defs.better / (defs.better + rnd.better), color = as.factor(n.default))) +
     geom_point() + geom_line()
   p2 = ggplot(perfs, aes(x = x.random, y = mean.difference.auc, color = as.factor(n.default))) +
     geom_point() + geom_line()
