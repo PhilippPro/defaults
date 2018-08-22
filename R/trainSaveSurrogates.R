@@ -4,7 +4,7 @@
 #'   Can be one of: measures = list(auc, acc, brier)
 #' @param scaling Scaling to use. 
 #'   Can be one of: scaling = c("none", "logit", "zscale", "scale01")
-trainSaveSurrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, measure = auc,
+trainSaveSurrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, measure = mlr::auc,
   scaling = "zscale") {
   data.ids = sort(unique(tbl.results$data_id))
   
@@ -27,49 +27,6 @@ trainSaveSurrogates = function(surrogate.mlr.lrn, lrn.par.set, learner.names, me
   return(surrogates)
 }
 
-
-#' Train and save surrogate models on perTask data
-#' @param surrogate.mlr.lrn Surrogate learner
-#' @param measure Name of the measure to optimize.
-#'   Can be one of: measures = list(auc, acc, brier)
-#' @param scaling Scaling to use. 
-#'   Can be one of: scaling = c("none", "logit", "zscale", "scale01")
-trainSaveSurrogates_pertask = function(surrogate.mlr.lrn, scaling = "zscale") {
-  
-  trainOnData = function(data, surrogate.mlr.lrn, task.id) {
-    data = data[data$task_id == task.id & !is.na(data$y), ]
-    data$task_id = NULL
-    if (length(dim(data)) != 2)
-      return(NULL)
-    tsk = makeRegrTask(data = data, target = "y")
-    tsk = impute(tsk, classes = list("numeric" = -11))
-    train(surrogate.mlr.lrn, removeConstantFeatures(tsk$task))
-  }
-  
-  foreach(arff = list.files("pertask", full.names = TRUE)) %do% {
-
-    # Read data
-    df = readARFF(arff) %>%
-      filter(y != 1) %>%
-      group_by(task_id) %>%
-      mutate(y = scale(y)) %>%
-      ungroup() %>%
-      as.data.frame()
-  
-    # Compute surrogates
-    surrogates = foreach(task.id = unique(df$task_id)) %dopar% {
-      sprintf("Learner: %s", basename(arff))
-      set.seed(199)
-      trainOnData(df, surrogate.mlr.lrn, task.id)
-    }
-    
-    # Save surrogates
-    saveRDS(surrogates, file = paste("surrogates/", surrogate.mlr.lrn$id,
-      basename(arff), "zscale", ".RDS", sep = "_", collapse = "_"))
-  }
-  messagef("Successfully computed all surrogates")
-  return(surrogates)
-}
 #' Create surrogate models for different tasks
 #' @param measure Name of the measure to optimize
 #' @param learner.name Name of learner
@@ -81,8 +38,8 @@ trainSaveSurrogates_pertask = function(surrogate.mlr.lrn, scaling = "zscale") {
 #' @param min.experiments minimum number of experiments that should be available for a dataset, otherwise the dataset is excluded
 #' @return surrogate model
 makeSurrogateModels = function(measure, learner.name, data.ids, tbl.results, 
-                               tbl.metaFeatures, tbl.hypPars, lrn.par.set, surrogate.mlr.lrn, scale_before = TRUE, scaling = "none") {
-  
+  tbl.metaFeatures, tbl.hypPars, lrn.par.set, surrogate.mlr.lrn,
+  scale_before = TRUE, scaling = "zscale") {
   
   param.set = lrn.par.set[[which(names(lrn.par.set) == paste0(substr(learner.name, 5, 100),
     ".set"))]]$param.set
@@ -107,6 +64,10 @@ makeSurrogateModels = function(measure, learner.name, data.ids, tbl.results,
     mlr.task.measure = makeRegrTask(id = as.character(data.idi), target = "measure.value",
                                     data = subset(task.data, data_id == data.idi,
                                              select =  c("measure.value", names(param.set$pars))))
+    # cubist only predicts 0 everywhere. use ranger instead
+    if(learner.name == "mlr.classif.xgboost") {
+      surrogate.mlr.lrn = makeLearner("regr.ranger", num.trees = 1000)
+    }
     train(surrogate.mlr.lrn, mlr.task.measure)
   }
   names(mlr.mod.measure) = data.ids
@@ -169,7 +130,48 @@ makeBotTable = function(measure, learner.name, tbl.results, tbl.metaFeatures, tb
   return(bot.table)
 }
 
-
+#' Train and save surrogate models on perTask data
+#' @param surrogate.mlr.lrn Surrogate learner
+#' @param measure Name of the measure to optimize.
+#'   Can be one of: measures = list(auc, acc, brier)
+#' @param scaling Scaling to use. 
+#'   Can be one of: scaling = c("none", "logit", "zscale", "scale01")
+trainSaveSurrogates_pertask = function(surrogate.mlr.lrn, scaling = "zscale") {
+  
+  trainOnData = function(data, surrogate.mlr.lrn, task.id) {
+    data = data[data$task_id == task.id & !is.na(data$y), ]
+    data$task_id = NULL
+    if (length(dim(data)) != 2)
+      return(NULL)
+    tsk = makeRegrTask(data = data, target = "y")
+    tsk = impute(tsk, classes = list("numeric" = -11))
+    train(surrogate.mlr.lrn, removeConstantFeatures(tsk$task))
+  }
+  
+  foreach(arff = list.files("pertask", full.names = TRUE)) %do% {
+    
+    # Read data
+    df = readARFF(arff) %>%
+      filter(y != 1) %>%
+      group_by(task_id) %>%
+      mutate(y = scale(y)) %>%
+      ungroup() %>%
+      as.data.frame()
+    
+    # Compute surrogates
+    surrogates = foreach(task.id = unique(df$task_id)) %dopar% {
+      sprintf("Learner: %s", basename(arff))
+      set.seed(199)
+      trainOnData(df, surrogate.mlr.lrn, task.id)
+    }
+    
+    # Save surrogates
+    saveRDS(surrogates, file = paste("surrogates/", surrogate.mlr.lrn$id,
+      basename(arff), "zscale", ".RDS", sep = "_", collapse = "_"))
+  }
+  messagef("Successfully computed all surrogates")
+  return(surrogates)
+}
 
 #' #' Resample surrogate models on all datasets
 #' #' @param surrogate.mlr.lrn Surrogate learner

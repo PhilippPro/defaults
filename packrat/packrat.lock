@@ -672,11 +672,12 @@ Requires: misc3d
 
 Package: plotly
 Source: CRAN
-Version: 4.7.1
-Hash: 18d2de809bf346363cd4ee7a587d58bf
+Version: 4.8.0
+Hash: 539126bf8ab38483d27005b4533f3ebe
 Requires: RColorBrewer, base64enc, crosstalk, data.table, digest,
     dplyr, ggplot2, hexbin, htmltools, htmlwidgets, httr, jsonlite,
-    lazyeval, magrittr, purrr, scales, tibble, tidyr, viridisLite
+    lazyeval, magrittr, promises, purrr, rlang, scales, tibble, tidyr,
+    viridisLite
 
 Package: plyr
 Source: CRAN

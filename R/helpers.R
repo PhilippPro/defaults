@@ -144,7 +144,7 @@ convertParamType = function(x, param_type) {
 }
 
 stringBuilder = function(folder, what, learner.name) {
-  files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist_classif")]
+  files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.*_classif")]
   stri_paste(folder, "/", what, gsub("regr.", "", files[grep(stri_sub(learner.name, from = 5), x = files)]))
 }
 
