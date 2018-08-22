@@ -3,7 +3,7 @@
 # @param par.set Parameter set
 # @param n.defauls How many defaults
 # @param probs Quantile to optimize
-searchDefaults = function(surrogates_train, par.set, n.defaults = 10, probs = 0.5) {
+searchDefaults = function(surrogates_train, par.set, n.defaults = 10, probs = 0.5, fs.config = NULL) {
 
   # Create the objective function we want to optimize
   pfun = makeObjFunction(surrogates_train, probs)
@@ -23,7 +23,7 @@ searchDefaults = function(surrogates_train, par.set, n.defaults = 10, probs = 0.
     }
 
     # Search for optimal points given previous defaults
-    z = focusSearchDefaults(pfun, surrogates_train, par.set, defaults.perf = defaults.perf)
+    z = focusSearchDefaults(pfun, surrogates_train, par.set, defaults.perf = defaults.perf, fs.config)
     catf("New best y: %f found for x: %s", z$y, paste0(z$x, collapse = ", "))
     # Add optimal point to defaults
     defaults.perf = cbind(defaults.perf, z$dsperfs)
@@ -52,11 +52,15 @@ makeObjFunction = function(surrogates_train, probs) {
       quantile(parmin, probs = probs)
     } else if (probs == "mean") {
       mean(parmin)
+    } else if (probs == "avg.quantiles357") {
+      mean(quantile(parmin, probs = c(0.3, 0.5, 0.7)))
+    } else if (probs == "avg.quantiles05595") {
+      mean(quantile(parmin, probs = c(0.05, 0.5, 0.95)))
     } else if (probs == "hodges-lehmann") {
       0.33 * max(parmin) + 0.67 * mean(parmin)
     }
   }
-
+  
   # Predict newdata, compute prediction
   function (x, defaults.perf = NULL) {
       # Compute predictions for each surrogate model
@@ -76,10 +80,14 @@ makeObjFunction = function(surrogates_train, probs) {
 # @param pfun Objective function
 # @param param.set Parameter set
 # @param defaults.perf = performances of defaults 1, ..., n-1.
-focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf) {
+focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf, fs.config) {
 
   # Do the focussearch
-  ctrl = makeFocusSearchControl(maxit = 1, restarts = 3, points = 10^1)
+  if (is.null(fs.config)) {
+    ctrl = makeFocusSearchControl(maxit = 1, restarts = 1, points = 10^4)
+  } else {
+    ctrl = makeFocusSearchControl(maxit = fs.config[1, 2], restarts = fs.config[1, 3], points = fs.config[1, 1])
+  }
   # For debugging:
   # ctrl = makeFocusSearchControl(1, 1, points = 30)
 

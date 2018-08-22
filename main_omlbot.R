@@ -113,7 +113,7 @@ for(i in c(2)) { # seq_along(learner.names)
   
   
   defs = readRDS(defs.file)
-  n.defs = c(2, 4, 6, 8, 10)
+  n.defs = c(1, 2, 4, 6, 8, 10)
   def.res.sur = foreach(it = seq_len(rin$desc$iters), .combine = "bind_rows") %:%
     foreach(n = n.defs, .combine = "bind_rows") %dopar% {
       evalDefaultsSurrogates(
@@ -126,7 +126,7 @@ for(i in c(2)) { # seq_along(learner.names)
     }
   set.seed(2999 + i)
   # Evaluate random search on OOB-Tasks on OpenML
-  n.rs   = c(4, 8, 16, 32, 64)
+  n.rs   = c(1, 2, 4, 8, 16, 32, 64)
   rs.res.sur = foreach (z = seq_len(30), .combine = "bind_rows") %:%
     foreach(it = seq_len(rin$desc$iters), .combine = "bind_rows") %:%
       foreach(n = n.rs, .combine = "bind_rows") %dopar% {

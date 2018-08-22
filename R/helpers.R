@@ -143,9 +143,12 @@ convertParamType = function(x, param_type) {
   return(x)
 }
 
-stringBuilder = function(folder, what, learner.name) {
+stringBuilder = function(folder, what, learner.name, cfg = NULL) {
   files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.*_classif")]
-  stri_paste(folder, "/", what, gsub("regr.", "", files[grep(stri_sub(learner.name, from = 5), x = files)]))
+  out = stri_paste(folder, "/", what, gsub("regr.", "", files[grep(stri_sub(learner.name, from = 5), x = files)]))
+  if (!is.null(cfg))
+    out = paste0(stri_sub(out, to = -6), "_", cfg, ".RDS")
+  return(out)
 }
 
 load_surrogates = function(learner.name) {

@@ -1,4 +1,10 @@
 library(shiny)
+library(devtools)
+library(stringi)
+library(rlang)
+library(dplyr)
+library(ggplot2)
+library(data.table)
 
 # Define UI for application that draws a histogram
 ui <- fluidPage(
@@ -11,26 +17,32 @@ ui <- fluidPage(
       sidebarPanel(
         selectInput("color",
           "Color / Grouping facet",
-          choices = c("search.type", "n", "learner.id", "task.id"),
-          selected = "n",
+          choices = c("search.type", "n", "learner.id", "task.id", "searchXn"),
+          selected = "search.type",
           multiple = FALSE
         ),
         selectInput("learner",
           "Learner",
-          choices = c("glmnet", "rpart", "svm", "xgboost"),
+          choices = c("glmnet", "rpart", "xgboost"), #"svm",
           selected = "rpart",
           multiple = TRUE
         ),
         selectInput("search.type",
-          "Number of defaults:",
+          "Search Type:",
           choices = c("design", "mbo", "package-default", "random", "defaults_mean", "defaults_cycle", "hodges-lehmann"),
-          selected = "design",
+          selected = c("design", "random"),
           multiple = TRUE
         ),
-        selectInput("n",
-         "Number of evaluations:",
-          choices = c(1, 2, 4, 6, 8, 10, 16, 32, 64),
-          selected = 10,
+        selectInput("nrs",
+         "Number of randomSearch evaluations:",
+          choices = c(4, 8, 16, 32, 64),
+          selected = 4,
+          multiple = TRUE
+        ),
+        selectInput("ndef",
+          "Number of defaults:",
+          choices = c(1, 2, 4, 6, 8, 10),
+          selected = 4,
           multiple = TRUE
         ),
         width = 2),
@@ -65,11 +77,13 @@ server <- function(input, output) {
     
     variable = rlang::sym(input$color)
     # Get Data
-    data = readRDS("../defaultLOOCV/full_results.Rds")$oob.perf %>%
+    data = readRDS("full_results.Rds")$oob.perf %>%
       filter(search.type %in% input$search.type) %>%
-      filter(n %in% input$n) %>%
+      filter(n %in% input$ndef | !(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann"))) %>%
+      filter(n %in% input$nrs | !(search.type %in% c("random"))) %>%
       filter(learner.id %in% learner) %>%
-      mutate(n = as.factor(n))
+      mutate(n = as.factor(n)) %>%
+      mutate(searchXn = paste(search.type, n, sep = "_"))
     
     data = data %>%
       group_by(task.id) %>%
@@ -85,6 +99,9 @@ server <- function(input, output) {
       } else if (input$color == "task.id") {
         data = data %>%
           group_by(task.id)
+      } else if (input$color == "searchXn") {
+        data = data %>%
+          group_by(searchXn)
       } else {
         data = data %>%
           group_by(search.type, n) 
@@ -110,11 +127,13 @@ server <- function(input, output) {
      learner = get_long_learner_name(input$learner)
      
      # Get Data
-     data = readRDS("../defaultLOOCV/full_results.Rds")$oob.perf %>%
+     data = readRDS("full_results.Rds")$oob.perf %>%
        filter(search.type %in% input$search.type) %>%
-       filter(n %in% input$n) %>%
+       filter(n %in% input$ndef | !(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann"))) %>%
+       filter(n %in% input$nrs | !(search.type %in% c("random"))) %>%
        filter(learner.id %in% learner) %>%
-       mutate(n = as.factor(n))
+       mutate(n = as.factor(n)) %>%
+       mutate(searchXn = paste(search.type, n, sep = "_"))
     
      ggplot(data, aes_string(x = "auc.test.mean", color = input$color)) +
        stat_ecdf() +
