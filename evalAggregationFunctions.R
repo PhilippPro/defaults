@@ -21,25 +21,25 @@ fs.configs = data.frame(
   reps = c(1, 5, 3)
   )
 
-registerDoMC(20)
-foreach(i = seq_len(6)) %:%
+registerDoMC(5)
+foreach(i = seq_len(6)[-3]) %:%
   foreach(aggrFun = c("mean", "hodges-lehmann", "design", "avg.quantiles357", "avg.quantiles05595")) %:%
   foreach(fs.config = seq_len(3)) %dopar% {
-    
+
     catf("Learner: %s", learner.names[i])
     fs.cfg.string = paste0(fs.configs[fs.config, ], collapse = "_")
     set.seed(199 + i)
-    
-    res.file = stringBuilder("evalAggrFuns/results", aggrFun, learner.names[i], fs.cfg.string) 
+
+    res.file = stringBuilder("evalAggrFuns/results", aggrFun, learner.names[i], fs.cfg.string)
     if (!file.exists(res.file))  {
       # Read surrogates from Hard Drive
       surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
       # Create resampling train/test splits
       rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
 
-      
+
       # Defaults
-      defs.file = stringBuilder("evalAggrFuns/defaults", aggrFun, learner.names[i], fs.cfg.string)  
+      defs.file = stringBuilder("evalAggrFuns/defaults", aggrFun, learner.names[i], fs.cfg.string)
       # Compute defaults if not yet available
       if (!file.exists(defs.file)) {
         # Iterate over ResampleInstance and its indices
@@ -53,13 +53,13 @@ foreach(i = seq_len(6)) %:%
             n.defaults = 10, # Number of defaults we want to find
             probs = aggrFun, # AggrFun we want to optimize
             fs.config = fs.configs[fs.config, ]
-            ) 
+            )
           return(defs)
         }
         # Save found defaults as RDS
         saveRDS(list("defaults" = defs), defs.file)
       }
-    
+
       defs = readRDS(defs.file)
       n.defs = c(1, 2, 4, 6, 8, 10)
       def.res.sur = foreach(it = seq_len(rin$desc$iters), .combine = "bind_rows") %:%
@@ -72,7 +72,7 @@ foreach(i = seq_len(6)) %:%
             it = it,
             n = n)
         }
-      
+
       # Evaluate random search on OOB-Tasks on OpenML
       n.rs   = c(1, 2, 4, 8, 16, 32, 64)
       rs.res.sur = foreach (z = seq_len(30), .combine = "bind_rows") %:%
@@ -86,14 +86,13 @@ foreach(i = seq_len(6)) %:%
             it = it,
             n = n)
         }
-      
       df = bind_rows(rs.res.sur, def.res.sur)
       df$learner.id = learner.names[i]
       df$aggrFun = aggrFun
-      df$cfg = fs.config.string
-    } else {
-      
+      df$cfg = fs.cfg.string
+
+      saveRDS(df, file = res.file)
     }
-  }
+}
 
 
