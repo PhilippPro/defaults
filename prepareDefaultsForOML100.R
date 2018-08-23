@@ -7,7 +7,7 @@ library(focussearch)  # Search the surrogates
 library(doMC)         # Parallelization
 load_all()
 
-registerDoMC(20)
+registerDoMC(25)
 
 # # Define a surrogate model
 # source("https://raw.githubusercontent.com/pfistfl/mlr-extralearner/master/R/RLearner_regr_fixcubist.R")
@@ -39,6 +39,7 @@ surrogates = readRDS("sklearn_oml100/surrogates.RDS")
 param.set = getSkLearnParamsets()
 
 
+sklearner = "libsvm_svc" #
 sklearner = "adaboost"
 
 # Defaults
@@ -54,7 +55,13 @@ if (!file.exists(defs.file)) {
       param.set[[sklearner]], # parameter space to search through
       n.defaults = 32)
     return(defs)
+    catf("Finished iteration %i!", it)
   }
   # Save found defaults as RDS
   saveRDS(list("defaults" = defs), defs.file)
 }
+
+df = do.call("bind_rows", readRDS(defs.file)$defaults)
+df$task_id = readARFF(paste0("sklearn_oml100/", sklearner, ".arff")) %>% pull(task_id) %>% unique() %>% rep(each = 32)
+df$default_no = rep(seq_len(32), nrow(df) / 32)
+writeARFF(df, paste0("sklearn_oml100/defaults", "_defaults_", sklearner, ".arff"), overwrite = TRUE)
