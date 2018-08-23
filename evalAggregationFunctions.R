@@ -22,16 +22,19 @@ fs.configs = data.frame(
   )
 
 registerDoMC(5)
+
 foreach(i = seq_len(6)[-3]) %:%
   foreach(aggrFun = c("mean", "hodges-lehmann", "design", "avg.quantiles357", "avg.quantiles05595")) %:%
   foreach(fs.config = seq_len(3)) %dopar% {
 
-    catf("Learner: %s", learner.names[i])
-    fs.cfg.string = paste0(fs.configs[fs.config, ], collapse = "_")
-    set.seed(199 + i)
 
+    fs.cfg.string = paste0(fs.configs[fs.config, ], collapse = "_")
     res.file = stringBuilder("evalAggrFuns/results", aggrFun, learner.names[i], fs.cfg.string)
     if (!file.exists(res.file))  {
+
+      catf("Learner: %s", learner.names[i])
+      set.seed(199 + i)
+
       # Read surrogates from Hard Drive
       surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
       # Create resampling train/test splits
@@ -39,7 +42,7 @@ foreach(i = seq_len(6)[-3]) %:%
 
 
       # Defaults
-      defs.file = stringBuilder("evalAggrFuns/defaults", aggrFun, learner.names[i], fs.cfg.string)
+      defs.file = stringBuilder("evalAggrFuns/defaults", aggrFun, learner.names[i], fs.cfg.string)[1]
       # Compute defaults if not yet available
       if (!file.exists(defs.file)) {
         # Iterate over ResampleInstance and its indices
@@ -58,9 +61,12 @@ foreach(i = seq_len(6)[-3]) %:%
         }
         # Save found defaults as RDS
         saveRDS(list("defaults" = defs), defs.file)
+        list("defaults" = defs)
+      } else {
+        defs = readRDS(defs.file)
       }
 
-      defs = readRDS(defs.file)
+
       n.defs = c(1, 2, 4, 6, 8, 10)
       def.res.sur = foreach(it = seq_len(rin$desc$iters), .combine = "bind_rows") %:%
         foreach(n = n.defs, .combine = "bind_rows") %do% {
@@ -92,7 +98,12 @@ foreach(i = seq_len(6)[-3]) %:%
       df$cfg = fs.cfg.string
 
       saveRDS(df, file = res.file)
+      df
+    } else {
+      catf("Skipped learner: %s", learner.names[i])
+      readRDS(res.file)
     }
 }
+
 
 
