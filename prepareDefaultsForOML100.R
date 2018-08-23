@@ -9,33 +9,40 @@ load_all()
 
 registerDoMC(20)
 
-# Define a surrogate model
-source("https://raw.githubusercontent.com/pfistfl/mlr-extralearner/master/R/RLearner_regr_fixcubist.R")
-surrogate.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 20)
+# # Define a surrogate model
+# source("https://raw.githubusercontent.com/pfistfl/mlr-extralearner/master/R/RLearner_regr_fixcubist.R")
+# surrogate.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 20)
 
-# Train Surrogates
-surrogates = foreach(sklearner = c("adaboost", "random_forest", "libsvm_svc")) %do% {
-  dflst = readARFF(paste0("sklearn_oml100/", sklearner, ".arff")) %>% split(x = . , f = .$task_id)
-  sklst = foreach( i = seq_len(length(dflst))) %dopar% {
-    tsk = dflst[[i]] %>%
-      preprocess_omldata(sklearner) %>%
-      makeRegrTask(id = paste0(sklearner, "_", names(dflst)[i]), data = ., target = "y") %>%
-      removeConstantFeatures()
-    mod = train(surrogate.lrn, tsk)
-  }
-  sklst
-}
-names(surrogates) = c("adaboost", "random_forest", "libsvm_svc")
-saveRDS(surrogates, "sklearn_oml100/surrogates.RDS")
+# # Train Surrogates
+# surrogates = foreach(sklearner = c("adaboost", "random_forest", "libsvm_svc")) %do% {
+#    # Invert as we minimize our measure, scale to mean = 0, sd = 1
+#   dflst = readARFF(paste0("sklearn_oml100/", sklearner, ".arff")) %>%
+#    group_by(task_id) %>%
+#    mutate(y = ((- y - mean(- y)) / max(sd(- y), 10^-12))) %>%
+#    ungroup() %>%
+#    data.frame() %>%
+#    split(x = . , f = .$task_id)
+
+#   sklst = foreach( i = seq_len(length(dflst))) %dopar% {
+#     tsk = dflst[[i]] %>%
+#       preprocess_omldata(sklearner) %>%
+#       makeRegrTask(id = paste0(sklearner, "_", names(dflst)[i]), data = ., target = "y") %>%
+#       removeConstantFeatures()
+#     mod = train(surrogate.lrn, tsk)
+#   }
+#   sklst
+# }
+# names(surrogates) = c("adaboost", "random_forest", "libsvm_svc")
+# saveRDS(surrogates, "sklearn_oml100/surrogates.RDS")
 
 surrogates = readRDS("sklearn_oml100/surrogates.RDS")
 param.set = getSkLearnParamsets()
 
-i = it = 1
+
 sklearner = "adaboost"
 
 # Defaults
-defs.file = stringBuilder("sklearn_oml100/defaults", "defaults", sklearner)
+defs.file = paste0("sklearn_oml100/defaults", "_defaults_", sklearner, ".RDS")
 # Compute defaults if not yet available
 if (!file.exists(defs.file)) {
   # Iterate over ResampleInstance and its indices
@@ -51,8 +58,3 @@ if (!file.exists(defs.file)) {
   # Save found defaults as RDS
   saveRDS(list("defaults" = defs), defs.file)
 }
-
-predict(mod,
- newdata = data.frame(algorithm = "SAMME", learning_rate = 0.1, max_depth = 1, n_estimators = 200, strategy = "median")
- )
-

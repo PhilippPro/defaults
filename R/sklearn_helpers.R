@@ -32,7 +32,7 @@ getSkLearnParamsets = function() {
 searchDefaultsOML100 = function(surrogates, par.set, n.defaults) {
 
   # Hardcode fs.config
-  fs.config = data.frame(iters = c(10^1), depth = c(1), reps = c(1))
+  fs.config = data.frame(iters = c(10^4), depth = c(1), reps = c(1))
 
   # Create the objective function we want to optimize
   pfun = makeObjFunction(surrogates, 0.5)
