@@ -69,6 +69,3 @@ df$default_no = rep(seq_len(32), nrow(df) / 32)
 if(sklearner == "random_forest")
   df = df %>%  rename(min_samples_leaf = min_leaf, min_samples_split = min_split)
 writeARFF(df, paste0("sklearn_oml100/defaults", "_defaults_", sklearner, ".arff"), overwrite = TRUE)
-
-it = 1
-i = 1
