@@ -7,40 +7,41 @@ library(focussearch)  # Search the surrogates
 library(doMC)         # Parallelization
 load_all()
 
-registerDoMC(25)
+registerDoMC(27)
 
 # # Define a surrogate model
-# source("https://raw.githubusercontent.com/pfistfl/mlr-extralearner/master/R/RLearner_regr_fixcubist.R")
-# surrogate.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 20)
+source("https://raw.githubusercontent.com/pfistfl/mlr-extralearner/master/R/RLearner_regr_fixcubist.R")
+surrogate.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 20)
 
-# # Train Surrogates
-# surrogates = foreach(sklearner = c("adaboost", "random_forest", "libsvm_svc")) %do% {
-#    # Invert as we minimize our measure, scale to mean = 0, sd = 1
-#   dflst = readARFF(paste0("sklearn_oml100/", sklearner, ".arff")) %>%
-#    group_by(task_id) %>%
-#    mutate(y = ((- y - mean(- y)) / max(sd(- y), 10^-12))) %>%
-#    ungroup() %>%
-#    data.frame() %>%
-#    split(x = . , f = .$task_id)
+# Train Surrogates
+surrogates = foreach(sklearner = c("adaboost", "random_forest", "libsvm_svc")) %do% {
+   # Invert as we minimize our measure, scale to mean = 0, sd = 1
+  dflst = readARFF(paste0("sklearn_oml100/", sklearner, ".arff")) %>%
+   group_by(task_id) %>%
+   mutate(y = ((- y - mean(- y)) / max(sd(- y), 10^-12))) %>%
+   ungroup() %>%
+   data.frame() %>%
+   split(x = . , f = .$task_id)
 
-#   sklst = foreach( i = seq_len(length(dflst))) %dopar% {
-#     tsk = dflst[[i]] %>%
-#       preprocess_omldata(sklearner) %>%
-#       makeRegrTask(id = paste0(sklearner, "_", names(dflst)[i]), data = ., target = "y") %>%
-#       removeConstantFeatures()
-#     mod = train(surrogate.lrn, tsk)
-#   }
-#   sklst
-# }
-# names(surrogates) = c("adaboost", "random_forest", "libsvm_svc")
-# saveRDS(surrogates, "sklearn_oml100/surrogates.RDS")
+  sklst = foreach( i = seq_len(length(dflst))) %dopar% {
+    tsk = dflst[[i]] %>%
+      preprocess_omldata(sklearner) %>%
+      makeRegrTask(id = paste0(sklearner, "_", names(dflst)[i]), data = ., target = "y") %>%
+      removeConstantFeatures()
+    mod = train(surrogate.lrn, tsk)
+  }
+  sklst
+}
+names(surrogates) = c("adaboost", "random_forest", "libsvm_svc")
+saveRDS(surrogates, "sklearn_oml100/surrogates.RDS")
 
 surrogates = readRDS("sklearn_oml100/surrogates.RDS")
 param.set = getSkLearnParamsets()
 
 
-sklearner = "libsvm_svc" #
+sklearner = "libsvm_svc"
 sklearner = "adaboost"
+sklearner = "random_forest"
 
 # Defaults
 defs.file = paste0("sklearn_oml100/defaults", "_defaults_", sklearner, ".RDS")
@@ -64,4 +65,10 @@ if (!file.exists(defs.file)) {
 df = do.call("bind_rows", readRDS(defs.file)$defaults)
 df$task_id = readARFF(paste0("sklearn_oml100/", sklearner, ".arff")) %>% pull(task_id) %>% unique() %>% rep(each = 32)
 df$default_no = rep(seq_len(32), nrow(df) / 32)
+
+if(sklearner == "random_forest")
+  df = df %>%  rename(min_samples_leaf = min_leaf, min_samples_split = min_split)
 writeARFF(df, paste0("sklearn_oml100/defaults", "_defaults_", sklearner, ".arff"), overwrite = TRUE)
+
+it = 1
+i = 1

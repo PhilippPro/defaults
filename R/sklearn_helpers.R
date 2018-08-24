@@ -7,12 +7,12 @@ getSkLearnParamsets = function() {
       makeNumericParam("learning_rate", lower = -6.643856, upper = 1, trafo = function(x) 2^x),
       makeNumericParam("max_depth", lower = 1, upper = 10)
     ),
-    "randomForest" = makeParamSet(
-      makeLogicalParam("bootstrap"),
+    "random_forest" = makeParamSet(
+      makeDiscreteParam("bootstrap", values = c("True", "False")),
       makeDiscreteParam("criterion", values = c("entropy", "gini")),
-      makeNumericParam("max_features", lower = 0.001, upper = 1),
-      makeNumericParam("min_samples_leaf", lower = 1, upper = 20),
-      makeNumericParam("min_samples_split", lower = 2, upper = 20),
+      makeNumericParam("max_features", lower = 0.01, upper = 1),
+      makeIntegerParam("min_leaf", lower = 1, upper = 20),
+      makeIntegerParam("min_split", lower = 2, upper = 20),
       makeDiscreteParam("strategy", values = c("mean", "median", "most_frequent"))
     ),
     "libsvm_svc"= makeParamSet(
@@ -58,8 +58,12 @@ searchDefaultsOML100 = function(surrogates, par.set, n.defaults) {
 preprocess_omldata = function(df, sklearner) {
   if(sklearner == "random_forest")
     df = df %>% mutate(
-      min_samples_leaf = as.numeric(as.character(min_samples_leaf)),
-      min_samples_split = as.numeric(as.character(min_samples_split))
-      )
+      min_samples_leaf = as.integer(as.character(min_samples_leaf)),
+      min_samples_split = as.integer(as.character(min_samples_split))
+      ) %>%
+      rename(
+        min_leaf = min_samples_leaf,
+        min_split = min_samples_split
+        )
   return(df)
 }
