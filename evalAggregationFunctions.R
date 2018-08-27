@@ -27,7 +27,7 @@ registerDoParallel(30)
 
 foreach(i = seq_len(6)[-5][-3]) %:%
   foreach(aggrFun = c("mean", "hodges-lehmann", "design")) %:% # "avg.quantiles357", "avg.quantiles05595"
-  foreach(fs.config = seq_len(2)) %dopar% {
+    foreach(fs.config = seq_len(2)) %do% {
 
 
     fs.cfg.string = paste0(fs.configs[fs.config, ], collapse = "_")
@@ -67,9 +67,12 @@ foreach(i = seq_len(6)[-5][-3]) %:%
         defs = readRDS(defs.file)
       }
 
+
+      defs = readRDS(defs.file)
+
       n.defs = c(1, 2, 4, 6, 8, 10)
       def.res.sur = foreach(it = seq_len(n_datasets), .combine = "bind_rows", .export = "surrogates") %:%
-        foreach(n = n.defs, .combine = "bind_rows", .export = "surrogates") %do% {
+        foreach(n = n.defs, .combine = "bind_rows", .export = "surrogates") %dopar% {
           evalDefaultsSurrogates(
             task.ids = names(surrogates$surrogates[it]),
             lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
@@ -83,7 +86,7 @@ foreach(i = seq_len(6)[-5][-3]) %:%
       n.rs   = c(1, 2, 4, 8, 16, 32, 64)
       rs.res.sur = foreach (z = seq_len(30), .combine = "bind_rows", .export = "surrogates") %:%
         foreach(it = seq_len(n_datasets), .combine = "bind_rows", .export = "surrogates") %:%
-        foreach(n = n.rs, .combine = "bind_rows", .export = "surrogates") %do% {
+        foreach(n = n.rs, .combine = "bind_rows", .export = "surrogates") %dopar% {
           evalRandomSearchSurrogates(
             task.ids = names(surrogates$surrogates[it]),
             lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
@@ -92,6 +95,7 @@ foreach(i = seq_len(6)[-5][-3]) %:%
             it = it,
             n = n)
         }
+
       df = bind_rows(rs.res.sur, def.res.sur)
       df$learner.id = learner.names[i]
       df$aggrFun = aggrFun
@@ -106,6 +110,32 @@ foreach(i = seq_len(6)[-5][-3]) %:%
   }
 
 
-# i = 1
-# aggrFun = "mean"
-# fs.config = 1
+lst = sapply(list.files("evalAggrFuns/results/", full.names = TRUE), readRDS, simplify = FALSE)
+df = do.call("bind_rows", lst)
+saveRDS(df,  "evalAggrFuns/aggrFunsResult.RDS")
+
+library(ggplot2)
+p = df %>%
+ group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
+ summarize(auc.scaled = mean(auc.scaled)) %>%
+ filter(search.type == "defaults") %>%
+ group_by(learner.id, task.id) %>%
+ mutate(n = as.factor(n)) %>%
+ ggplot(aes(x = n, y = auc.scaled, color = aggrFun)) +
+ geom_boxplot() +
+ facet_wrap(~learner.id)
+ggsave(filename = "evalAggrFuns/boxplot_comparison_by_learner.png", plot = p)
+
+p2 = df %>%
+ group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
+ summarize(auc.scaled = - mean(auc.scaled)) %>%
+ filter(search.type == "defaults") %>%
+ filter(cfg == "1000_2_5") %>%
+ group_by(task.id) %>%
+ mutate(auc.scaled = (auc.scaled - max(min(auc.scaled), 0)) / max(auc.scaled)) %>%
+ mutate(n = as.factor(n)) %>%
+ ggplot(aes(x = auc.scaled, color = aggrFun)) +
+ stat_ecdf() +
+ coord_flip() +
+ facet_wrap(~learner.id, scales = "free_y")
+ggsave(filename = "evalAggrFuns/ecdf_comparison_by_learner.png", plot = p2)
