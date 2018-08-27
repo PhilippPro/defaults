@@ -5,6 +5,7 @@ library(doParallel)   # Parallelization
 library(doMC)         # Parallelization
 library(doRNG)        # Parallel RNG
 library(foreach)      # Parallelization
+library(mlr)
 load_all()
 
 # Load neccessary files
@@ -19,17 +20,19 @@ fs.configs = data.frame(
   iters = c(10^4, 10^3, 1.11 * 10^3),
   depth = c(1, 2, 3),
   reps = c(1, 5, 3)
-  )
+)
 
-registerDoMC(5)
+registerDoParallel(30)
+# registerDoSEQ()
 
-foreach(i = seq_len(6)[-3]) %:%
-  foreach(aggrFun = c("mean", "hodges-lehmann", "design", "avg.quantiles357", "avg.quantiles05595")) %:%
-  foreach(fs.config = seq_len(3)) %dopar% {
+foreach(i = seq_len(6)[-5][-3]) %:%
+  foreach(aggrFun = c("mean", "hodges-lehmann", "design")) %:% # "avg.quantiles357", "avg.quantiles05595"
+  foreach(fs.config = seq_len(2)) %dopar% {
 
 
     fs.cfg.string = paste0(fs.configs[fs.config, ], collapse = "_")
     res.file = stringBuilder("evalAggrFuns/results", aggrFun, learner.names[i], fs.cfg.string)
+
     if (!file.exists(res.file))  {
 
       catf("Learner: %s", learner.names[i])
@@ -37,41 +40,38 @@ foreach(i = seq_len(6)[-3]) %:%
 
       # Read surrogates from Hard Drive
       surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
-      # Create resampling train/test splits
-      rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
-
 
       # Defaults
       defs.file = stringBuilder("evalAggrFuns/defaults", aggrFun, learner.names[i], fs.cfg.string)[1]
+      n_datasets = length(surrogates$surrogates)
       # Compute defaults if not yet available
       if (!file.exists(defs.file)) {
         # Iterate over ResampleInstance and its indices
-        defs = foreach(it = seq_len(rin$desc$iters)) %dorng% {
+        defs = foreach(it = seq_len(n_datasets), .export = "surrogates") %do% {
           if(aggrFun == "design") aggrFun = 0.5 # Design means optimize the median
           set.seed(199 + i)
           # Search for defaults
           defs = searchDefaults(
-            surrogates$surrogates[rin$train.inds[[it]]], # training surrogates (L-1-Out-CV)
+            surrogates$surrogates[-it], # training surrogates (L-1-Out-CV)
             surrogates$param.set, # parameter space to search through
             n.defaults = 10, # Number of defaults we want to find
             probs = aggrFun, # AggrFun we want to optimize
             fs.config = fs.configs[fs.config, ]
-            )
+          )
           return(defs)
         }
         # Save found defaults as RDS
         saveRDS(list("defaults" = defs), defs.file)
-        list("defaults" = defs)
+        defs = list("defaults" = defs)
       } else {
         defs = readRDS(defs.file)
       }
 
-
       n.defs = c(1, 2, 4, 6, 8, 10)
-      def.res.sur = foreach(it = seq_len(rin$desc$iters), .combine = "bind_rows") %:%
-        foreach(n = n.defs, .combine = "bind_rows") %do% {
+      def.res.sur = foreach(it = seq_len(n_datasets), .combine = "bind_rows", .export = "surrogates") %:%
+        foreach(n = n.defs, .combine = "bind_rows", .export = "surrogates") %do% {
           evalDefaultsSurrogates(
-            task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
+            task.ids = names(surrogates$surrogates[it]),
             lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
             defaults = defs$defaults,
             ps = surrogates$param.set,
@@ -81,11 +81,11 @@ foreach(i = seq_len(6)[-3]) %:%
 
       # Evaluate random search on OOB-Tasks on OpenML
       n.rs   = c(1, 2, 4, 8, 16, 32, 64)
-      rs.res.sur = foreach (z = seq_len(30), .combine = "bind_rows") %:%
-        foreach(it = seq_len(rin$desc$iters), .combine = "bind_rows") %:%
-        foreach(n = n.rs, .combine = "bind_rows") %do% {
+      rs.res.sur = foreach (z = seq_len(30), .combine = "bind_rows", .export = "surrogates") %:%
+        foreach(it = seq_len(n_datasets), .combine = "bind_rows", .export = "surrogates") %:%
+        foreach(n = n.rs, .combine = "bind_rows", .export = "surrogates") %do% {
           evalRandomSearchSurrogates(
-            task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
+            task.ids = names(surrogates$surrogates[it]),
             lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
             defaults = defs$defaults,
             ps = surrogates$param.set,
@@ -103,7 +103,9 @@ foreach(i = seq_len(6)[-3]) %:%
       catf("Skipped learner: %s", learner.names[i])
       readRDS(res.file)
     }
-}
+  }
 
 
-
+# i = 1
+# aggrFun = "mean"
+# fs.config = 1
