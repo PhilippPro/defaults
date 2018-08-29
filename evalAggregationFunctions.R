@@ -128,14 +128,16 @@ ggsave(filename = "evalAggrFuns/boxplot_comparison_by_learner.png", plot = p)
 
 p2 = df %>%
  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
- summarize(auc.scaled = - mean(auc.scaled)) %>%
+ summarize(auc.scaled = mean(auc.scaled)) %>%
  filter(search.type == "defaults") %>%
  filter(cfg == "1000_2_5") %>%
  group_by(task.id) %>%
- mutate(auc.scaled = (auc.scaled - max(min(auc.scaled), 0)) / max(auc.scaled)) %>%
  mutate(n = as.factor(n)) %>%
+ filter(n = 10) %>%
  ggplot(aes(x = auc.scaled, color = aggrFun)) +
  stat_ecdf() +
  coord_flip() +
  facet_wrap(~learner.id, scales = "free_y")
 ggsave(filename = "evalAggrFuns/ecdf_comparison_by_learner.png", plot = p2)
+
+ # mutate(auc.scaled = (auc.scaled - max(min(auc.scaled), 0)) / max(auc.scaled)) %>%
