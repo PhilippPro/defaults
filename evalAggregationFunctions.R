@@ -81,7 +81,10 @@ foreach(i = seq_len(6)[-5][-3]) %:%
             it = it,
             n = n)
         }
+      def.res.sur$aggrFun = aggrFun
+      def.res.sur$cfg = fs.cfg.string
 
+      if (aggrFun == "mean" & fs.config == 1) {
       # Evaluate random search on OOB-Tasks on OpenML
       n.rs   = c(1, 2, 4, 8, 16, 32, 64)
       rs.res.sur = foreach (z = seq_len(30), .combine = "bind_rows", .export = "surrogates") %:%
@@ -95,14 +98,14 @@ foreach(i = seq_len(6)[-5][-3]) %:%
             it = it,
             n = n)
         }
+        rs.res.sur$aggrFun = "random"
+        rs.res.sur$cfg = "n_1_1"
+        def.res.sur = bind_rows(def.res.sur, rs.res.sur)
+      }
+      def.res.sur$learner.id = learner.names[i]
 
-      df = bind_rows(rs.res.sur, def.res.sur)
-      df$learner.id = learner.names[i]
-      df$aggrFun = aggrFun
-      df$cfg = fs.cfg.string
 
-      saveRDS(df, file = res.file)
-      df
+      saveRDS(def.res.sur, file = res.file)
     } else {
       catf("Skipped learner: %s", learner.names[i])
       readRDS(res.file)
@@ -112,7 +115,9 @@ foreach(i = seq_len(6)[-5][-3]) %:%
 
 lst = sapply(list.files("evalAggrFuns/results/", full.names = TRUE), readRDS, simplify = FALSE)
 df = do.call("bind_rows", lst)
+df$learner.id = factor(df$learner.id, labels = c("glmnet", "rpart", "svm", "xgboost"))
 saveRDS(df,  "evalAggrFuns/aggrFunsResult.RDS")
+
 
 library(ggplot2)
 p = df %>%
@@ -120,6 +125,7 @@ p = df %>%
  summarize(auc.scaled = mean(auc.scaled)) %>%
  filter(search.type == "defaults") %>%
  group_by(learner.id, task.id) %>%
+ filter(n %in% c(1, 2, 4, 8)) %>%
  mutate(n = as.factor(n)) %>%
  ggplot(aes(x = n, y = auc.scaled, color = aggrFun)) +
  geom_boxplot() +
@@ -133,11 +139,65 @@ p2 = df %>%
  filter(cfg == "1000_2_5") %>%
  group_by(task.id) %>%
  mutate(n = as.factor(n)) %>%
- filter(n = 10) %>%
+ filter(n == 10) %>%
  ggplot(aes(x = auc.scaled, color = aggrFun)) +
  stat_ecdf() +
  coord_flip() +
  facet_wrap(~learner.id, scales = "free_y")
 ggsave(filename = "evalAggrFuns/ecdf_comparison_by_learner.png", plot = p2)
 
- # mutate(auc.scaled = (auc.scaled - max(min(auc.scaled), 0)) / max(auc.scaled)) %>%
+p2.2 = df %>%
+ group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
+ summarize(auc.scaled = mean(auc.scaled)) %>%
+ filter(learner.id %in% c("rpart", "xgboost")) %>%
+ filter(search.type == "defaults") %>%
+ filter(cfg == "1000_2_5") %>%
+ group_by(task.id) %>%
+ mutate(n = as.factor(n)) %>%
+ filter(n  %in% c(2, 4, 8)) %>%
+ ggplot(aes(x = auc.scaled, color = aggrFun)) +
+ stat_ecdf() +
+ coord_flip() +
+ facet_wrap(~learner.id, nrow = 1, scales = "free_y") +
+ theme(legend.position="bottom", legend.title = element_text("Aggregation function")) +
+ xlab("Normalized Area under the Curve") +
+ ylab("Quantile")
+ggsave(filename = "evalAggrFuns/ecdf_comparison_2_learner.png", plot = p2.2, width = 4, height = 3)
+
+
+p3 = df %>%
+ group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
+ summarize(auc.scaled = mean(auc.scaled)) %>%
+ filter(n %in% c(1, 2, 4, 8, 16, 32)) %>%
+ filter(aggrFun %in% c("design", "random")) %>%
+ group_by(learner.id, task.id) %>%
+ mutate(n = as.factor(n)) %>%
+ ggplot(aes(x = n, y = auc.scaled, color = search.type)) +
+ geom_boxplot() +
+ facet_wrap(~learner.id, scales = "free_y") +
+ theme(legend.position="bottom") +
+ ylab("Normalized Area under the Curve") +
+ xlab("No. evaluations")
+ggsave(filename = "evalAggrFuns/boxplot_compare_search_by_learner.png", plot = p)
+
+p = df %>%
+ group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
+ summarize(auc.scaled = mean(auc.scaled)) %>%
+ filter(n %in% c(1, 2, 4, 8, 16, 32)) %>%
+ filter(aggrFun %in% c("design", "random")) %>%
+ group_by(learner.id, task.id) %>%
+ mutate(n = as.factor(n)) %>%
+ ggplot(aes(x = n, y = auc.scaled, color = search.type)) +
+ geom_boxplot() +
+ facet_wrap(~learner.id, scales = "free_y") +
+ theme(legend.position="bottom") +
+ ylab("Normalized Area under the Curve") +
+ xlab("No. evaluations")
+ggsave(filename = "evalAggrFuns/boxplot_compare_search_by_learner.png", plot = p)
+
+
+df %>%
+ group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
+ filter(cfg == "10000_1_1") %>%
+ filter(n %in% c(1, 2, 4, 8, 16)) %>%
+ filter(search.type == "random")

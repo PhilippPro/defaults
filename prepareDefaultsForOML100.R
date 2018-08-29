@@ -94,4 +94,6 @@ registerDoMC(3)
 
 
 defs.files = paste0("full_defaults/median_defaults_sklearn_", sklearner, ".RDS")
-sapply(defs.files, function(x) {farff::writeARFF(readRDS(x)$defaults,  paste0(substr(x, to = -5), "arff"))
+sapply(defs.files, function(x) {farff::writeARFF(readRDS(x)$defaults,
+  paste0(stringi::stri_sub(x, to = -5), "arff"))})
+

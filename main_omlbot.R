@@ -36,7 +36,8 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
 
 # Forward selection ----------------------------------------------------------------------------------
 files = list.files("surrogates")[grep(x = list.files("surrogates"), pattern = "_regr.*_classif")]
-for(i in c(2)) { # seq_along(learner.names)
+# or(i in c(2)) { # seq_along(learner.names)
+  i = 1
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
 
@@ -44,7 +45,7 @@ for(i in c(2)) { # seq_along(learner.names)
   surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)])[1])
   # Create resampling train/test splits
   rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
-  registerDoMC(24)
+  registerDoMC(22)
 
   # ------------------------------------------------------------------------------------------------
   # Defaults
@@ -58,7 +59,7 @@ for(i in c(2)) { # seq_along(learner.names)
       defs = searchDefaults(
         surrogates$surrogates[rin$train.inds[[it]]], # training surrogates (L-1-Out-CV)
         surrogates$param.set, # parameter space to search through
-        n.defaults = 10, # Number of defaults we want to find
+        n.defaults = 32, # Number of defaults we want to find
         probs = 0.5) # Quantile we want to optimize
       return(defs)
     }
@@ -70,7 +71,7 @@ for(i in c(2)) { # seq_along(learner.names)
   # Evaluate found defaults on OOB-Tasks on OpenML
   defs = readRDS(defs.file)
 
-  n.defs = c(2, 4, 6, 8, 10)
+  n.defs = c(1, 2, 4, 8, 16, 32)
   def.res = foreach(it = seq_len(rin$desc$iters)[-30]) %:%
     foreach(n = n.defs) %dopar% {
       evalDefaultsOpenML(
@@ -104,6 +105,15 @@ for(i in c(2)) { # seq_along(learner.names)
       it = it,
       n = 1)
 
+  # Evaluate Package Defaults on OOB-Tasks on OpenML
+  oml.res = foreach(it = seq_len(rin$desc$iters)) %dopar%
+    evalMBOOpenML(
+      task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
+      lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
+      defaults = defs$defaults,
+      ps = surrogates$param.set,
+      it = it,
+      n = 32)
 
   # Evaluate against random search on Surrogates
   # Evaluate random search on OOB-Tasks on OpenML
@@ -283,5 +293,5 @@ foreach(i = c(1, 2, 4, 5, 6)) %dopar% {
 }
 
 defs.files = list.files("full_defaults", full.names = TRUE)
-sapply(defs.files, function(x) {farff::writeARFF(readRDS(x)$defaults, paste0(stri_sub(x, to = -5), "arff"))})
+sapply(defs.files,  function(x) {farff::writeARFF(readRDS(x)$defaults, paste0(stringi::stri_sub(x, to = -5), "arff"))})
 
