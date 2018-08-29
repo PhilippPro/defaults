@@ -282,3 +282,6 @@ foreach(i = c(1, 2, 4, 5, 6)) %dopar% {
   }
 }
 
+defs.files = list.files("full_defaults", full.names = TRUE)
+sapply(defs.files, function(x) {farff::writeARFF(readRDS(x)$defaults, paste0(stri_sub(x, to = -5), "arff"))})
+
