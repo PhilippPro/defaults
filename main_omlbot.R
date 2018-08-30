@@ -37,7 +37,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
 # Forward selection ----------------------------------------------------------------------------------
 files = list.files("surrogates")[grep(x = list.files("surrogates"), pattern = "_regr.*_classif")]
 # or(i in c(2)) { # seq_along(learner.names)
-  i = 1
+  i = 6
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
 

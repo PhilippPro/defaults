@@ -146,7 +146,7 @@ p2 = df %>%
  facet_wrap(~learner.id, scales = "free_y")
 ggsave(filename = "evalAggrFuns/ecdf_comparison_by_learner.png", plot = p2)
 
-library(hrbrthemes)
+
 p2.2 = df %>%
  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
  summarize(auc.scaled = mean(auc.scaled)) %>%
@@ -161,7 +161,8 @@ p2.2 = df %>%
  coord_flip() +
  facet_wrap(~learner.id, nrow = 1, scales = "free_y") +
  theme_bw() +
- theme(legend.position="bottom", legend.title = element_text("Aggregation function")) +
+ theme(legend.position="bottom") +
+ labs(color = "Aggregation Function") +
  xlab("Normalized Area under the Curve") +
  ylab("Quantile")
 ggsave(filename = "evalAggrFuns/ecdf_comparison_2_learner.png", plot = p2.2, width = 4, height = 3)
