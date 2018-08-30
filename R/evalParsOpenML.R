@@ -36,7 +36,7 @@ evalMBOOpenML = function(task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) 
 # @param defaults Set of default parameters
 evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALSE) {
 
-  filepath = stringBuilder("defaultLOOCV/save", stri_paste(ctrl, n, it, "perf", sep = "_"), lrn$id)
+  filepath = stringBuilder("defaultLOOCV/save", stri_paste(ctrl, n, it, "perf", sep = "_"), lrn$id)[1]
   print(filepath)
   # For now we skip task.id %in% c("1486") as they are very big
   if (!file.exists(filepath) | overwrite) {
@@ -101,8 +101,8 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
     resdf$search.type = ctrl
     resdf$n = n
     saveRDS(resdf, filepath)
-    saveRDS(extractSubList(res, "bmr", simplify = FALSE),
-      stringBuilder("defaultLOOCV/bmrs", stri_paste(ctrl, n, it, "perf", sep = "_"), lrn$id))
+    # saveRDS(extractSubList(res, "bmr", simplify = FALSE),
+    #  stringBuilder("defaultLOOCV/bmrs", stri_paste(ctrl, n, it, "perf", sep = "_"), lrn$id))
   } else {
     res = readRDS(filepath)
   }
