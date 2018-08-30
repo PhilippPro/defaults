@@ -147,6 +147,7 @@ p2 = df %>%
 ggsave(filename = "evalAggrFuns/ecdf_comparison_by_learner.png", plot = p2)
 
 
+df$aggrFun = factor(df$aggrFun, labels = c("median", "hodges-lehmann", "mean", "random"))
 p2.2 = df %>%
  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
  summarize(auc.scaled = mean(auc.scaled)) %>%
