@@ -60,7 +60,7 @@ makeObjFunction = function(surrogates_train, probs) {
       0.33 * max(parmin) + 0.67 * mean(parmin)
     }
   }
-  
+
   # Predict newdata, compute prediction
   function (x, defaults.perf = NULL) {
       # Compute predictions for each surrogate model
@@ -80,11 +80,11 @@ makeObjFunction = function(surrogates_train, probs) {
 # @param pfun Objective function
 # @param param.set Parameter set
 # @param defaults.perf = performances of defaults 1, ..., n-1.
-focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf, fs.config) {
+focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf, fs.config = NULL) {
 
   # Do the focussearch
   if (is.null(fs.config)) {
-    ctrl = makeFocusSearchControl(maxit = 1, restarts = 1, points = 10^4)
+    ctrl = makeFocusSearchControl(maxit = 10, restarts = 1, points = 10^4)
   } else {
     ctrl = makeFocusSearchControl(maxit = fs.config[1, 2], restarts = fs.config[1, 3], points = fs.config[1, 1])
   }
@@ -111,9 +111,7 @@ getDefaultPerfs = function(surrogates, defaults.params, train.inds = train_split
 
   # Which split do we want to predict on? (train or test datasets)
   # Predict on each split
-  prd = sapply(surrogates, function(x) {
-    predict(x, newdata = defaults.params)$data$response
-  })
+  prd = sapply(surrogates, function(x) {predict(x, newdata = defaults.params)$data$response})
   prd = as.data.frame(prd)
   colnames(prd) = ifelse(colnames(prd) %in% colnames(prd)[train.inds], paste0(colnames(prd), "_train"),
                          paste0(colnames(prd), "_test"))
