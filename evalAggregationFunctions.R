@@ -166,7 +166,7 @@ p2.2 = df %>%
  labs(color = "Aggregation Function") +
  xlab("Normalized Area under the Curve") +
  ylab("Quantile")
-ggsave(filename = "evalAggrFuns/ecdf_comparison_2_learner.png", plot = p2.2, width = 4, height = 3)
+ggsave(filename = "evalAggrFuns/ecdf_comparison_2_learner.png", plot = p2.2, width = 4, height = 4, scale = 1.5)
 ggsave(filename = "../paper_2018_multiple_defaults/figures/ecdf_comparison_2_learner.pdf",
  plot = p2.2, width = 10.5, height = 6.5, scale = 1)
 
