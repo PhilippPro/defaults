@@ -118,8 +118,11 @@ df = do.call("bind_rows", lst)
 df$learner.id = factor(df$learner.id, labels = c("glmnet", "rpart", "svm", "xgboost"))
 saveRDS(df,  "evalAggrFuns/aggrFunsResult.RDS")
 
-
+df = readRDS("evalAggrFuns/aggrFunsResult.RDS")
+df$learner.id = factor(df$learner.id, labels = c("glmnet", "rpart", "svm", "xgboost"))
 library(ggplot2)
+library(hrbrthemes)
+
 p = df %>%
  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
  summarize(auc.scaled = mean(auc.scaled)) %>%
@@ -166,7 +169,8 @@ p2.2 = df %>%
  labs(color = "Aggregation Function") +
  xlab("Normalized Area under the Curve") +
  ylab("Quantile")
-ggsave(filename = "evalAggrFuns/ecdf_comparison_2_learner.png", plot = p2.2, width = 4, height = 4, scale = 1.5)
+
+ggsave(filename = "evalAggrFuns/ecdf2learner.pdf", plot = p2.2, width = 4, height = 3, scale = 1.5)
 ggsave(filename = "../paper_2018_multiple_defaults/figures/ecdf_comparison_2_learner.pdf",
  plot = p2.2, width = 10.5, height = 6.5, scale = 1)
 
@@ -174,16 +178,37 @@ p3 = df %>%
  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
  summarize(auc.scaled = mean(auc.scaled)) %>%
  filter(n %in% c(1, 2, 4, 8, 16, 32)) %>%
- filter(aggrFun %in% c("design", "random")) %>%
+ filter(aggrFun %in% c("median", "random")) %>%
  group_by(learner.id, task.id) %>%
  mutate(n = as.factor(n)) %>%
  ggplot(aes(x = n, y = auc.scaled, color = search.type)) +
  geom_boxplot() +
+
  facet_wrap(~learner.id, scales = "free_y") +
  theme(legend.position="bottom") +
  ylab("Normalized Area under the Curve") +
  xlab("No. evaluations")
 ggsave(filename = "evalAggrFuns/boxplot_compare_search_by_learner.png", plot = p)
+
+
+p3.2 = df %>%
+  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
+  summarize(auc.scaled = mean(auc.scaled)) %>%
+  filter(n %in% c(1, 2, 4, 8, 16, 32)) %>%
+  filter(aggrFun %in% c("median", "random")) %>%
+  filter(learner.id %in% c("svm", "xgboost")) %>%
+  group_by(learner.id, task.id) %>%
+  mutate(n = as.factor(n)) %>%
+  ggplot(aes(x = n, y = auc.scaled, color = search.type)) +
+  geom_boxplot() +
+  scale_color_brewer(type = "div", palette = "Set2") +
+  theme_bw() +
+  facet_wrap(~learner.id, scales = "free_y") +
+  theme(legend.position="bottom") +
+  ylab("Normalized Area under the Curve") +
+  xlab("No. evaluations") +
+  labs(color = "Search method")
+ggsave(filename = "evalAggrFuns/boxplot2learners.pdf", plot = p3.2)
 
 p = df %>%
  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
