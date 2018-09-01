@@ -1,3 +1,5 @@
+# Script used to evaluate the different aggregation functions on surrogate models
+
 library(devtools)     # load_all()
 library(stringi)      # string manipulation
 library(focussearch)  # Search the surrogates
