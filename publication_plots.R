@@ -87,11 +87,12 @@ ggsave("defaultLOOCV/boxplots_auc_full.pdf", plot = pfull, height = 8, width = 4
 
 # Critical Differences
 
-mask = df %>% group_by(task.id) %>% summarize(n = n()) %>% arrange(desc(n)) %>% filter(n == 42)
-aggr.meas = "auc.test.mean"
 
 
 create_cdplot = function(learner) {
+	mask = df %>% group_by(task.id) %>% summarize(n = n()) %>% arrange(desc(n)) %>% filter(n == 42)
+	aggr.meas = "auc.test.mean"
+
 	dft = df[df$task.id %in% mask$task.id, ] %>%
 	  mutate(search_n = paste0(search.type, "_", n)) %>%
 	  filter(learner.short == learner) %>%
@@ -119,7 +120,7 @@ create_cdplot = function(learner) {
 	 group_by(search_n) %>%
 	 summarize(mean_rank = mean(rnk)) %>%
 	 mutate(right = mean_rank > median(mean_rank)) %>%
-	 mutate(yend = min_rank(mean_rank)) %>%
+	 mutate(yend = min_rank(mean_rank) - 0.75 + 0.1*row_number()) %>%
 	 mutate(yend = ifelse(yend < median(yend), yend, max(yend) - yend + 1)) %>%
 	 mutate(xend = ifelse(!right, 0L, max(mean_rank) + 1L)) %>%
 	 mutate(right = as.numeric(right))
@@ -153,11 +154,25 @@ create_cdplot = function(learner) {
 	p = p + annotate("segment",
 	               x =  mean(dd$mean_rank) - 0.5 * cd.nemenyi,
 	               xend = mean(dd$mean_rank) + 0.5 * cd.nemenyi,
-	               y = max(dd$yend) + .2,
-	               yend = max(dd$yend) + .2,
+	               y = max(dd$yend) + .25,
+	               yend = max(dd$yend) + .25,
 	               size = 2L)
+	p = p + theme(axis.text.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                axis.title.y = element_blank(),
+                legend.position = "none",
+                panel.background = element_blank(),
+                panel.border = element_blank(),
+                axis.line = element_line(size = 1),
+                axis.line.y = element_blank(),
+                panel.grid.major = element_blank(),
+                plot.background = element_blank())
+	p = p + ggtitle(learner)
+
 	p
 }
-create_cdplot("Decision Tree")
-create_cdplot("ElasticNet")
-create_cdplot("Xgboost")
+library(patchwork)
+pcd = (create_cdplot("Decision Tree") + xlab("")) /
+(create_cdplot("ElasticNet") + xlab("")) /
+(create_cdplot("Xgboost") + xlab("Average Rank"))
+ggsave("defaultLOOCV/cdplots.pdf", plot = pcd, height = 8, width = 4, scale = 1.35)
