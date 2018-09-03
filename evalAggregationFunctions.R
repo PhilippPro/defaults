@@ -175,6 +175,8 @@ p2.2 = df %>%
 ggsave(filename = "evalAggrFuns/ecdf2learner.pdf", plot = p2.2, width = 4, height = 3, scale = 1.5)
 ggsave(filename = "../paper_2018_multiple_defaults/figures/ecdf_comparison_2_learner.pdf",
  plot = p2.2, width = 10.5, height = 6.5, scale = 1)
+ggsave(filename = "../paper_2018_multiple_defaults/figures/ecdfposter2learner.pdf",
+ plot = p2.2, width = 10.5, height = 6, scale = 1)
 
 p3 = df %>%
  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%

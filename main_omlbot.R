@@ -37,7 +37,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   # Forward selection ----------------------------------------------------------------------------------
   files = list.files("surrogates")[grep(x = list.files("surrogates"), pattern = "_regr.*_classif")]
   # for(i in c(2)) { # seq_along(learner.names)
-  i = 2
+  i = 6
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
 
@@ -46,7 +46,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   # Create resampling train/test splits
   rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
   parallelMap::parallelStartMulticore(10, level = "mlr.resample")
-  # registerDoMC(7)
+  registerDoMC(2)
 
   # ------------------------------------------------------------------------------------------------
   # Defaults
@@ -107,7 +107,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
       n = 1)
 
   # Evaluate Package Defaults on OOB-Tasks on OpenML
-  oml.res = foreach(it = seq_len(rin$desc$iters)) %dopar%
+  oml.res = foreach(it = rev(seq_len(rin$desc$iters))) %dopar%
     evalMBOOpenML(
       task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
       lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),

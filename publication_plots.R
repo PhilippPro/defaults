@@ -2,7 +2,6 @@
 library(devtools)
 load_all()
 
-
 df = readRDS("defaultLOOCV/full_results.Rds")$oob.perf %>%
 	mutate(n = as.factor(n)) %>%
 	mutate(search.type = recode(search.type, "design" = "defaults")) %>%
@@ -18,6 +17,7 @@ df = readRDS("defaultLOOCV/full_results.Rds")$oob.perf %>%
 df %>%
  group_by(learner.short, search.type, n) %>% 
  tally(n()) %>%
+ filter(nn < 36) %>%
  print(n = 44)
 
 
@@ -90,20 +90,25 @@ ggsave("defaultLOOCV/boxplots_auc_full.pdf", plot = pfull, height = 8, width = 4
 
 # Critical Differences
 
-create_cdplot = function(learner) {
-	mask = df %>% group_by(task.id) %>% summarize(n = n()) %>% arrange(desc(n)) %>% filter(n == 42)
-	aggr.meas = "auc.test.mean"
+create_cdplot = function(df, learner, aggr.meas = "auc.test.mean") {
+	mask = df %>%
+	 filter(learner.short == learner) %>%
+	 group_by(task.id) %>% summarize(n = n()) %>% 
+	 arrange(desc(n)) %>% 
+	 filter(n == max(n))
 
-	dft = df[df$task.id %in% mask$task.id, ] %>%
+	dft = df %>%
+	  filter(task.id %in% mask$task.id) %>%
 	  mutate(search_n = paste0(search.type, "_", n)) %>%
 	  filter(learner.short == learner) %>%
 	  filter(n %in% c(2, 4, 8, 16, 32)) %>%
 	  mutate(search_n = paste0(search.type, "_", n)) %>%
-	  filter(search_n %in% c("random_8", "random_16", "random_32", "mbo_32", "defaults_8", "defaults_4"))
+	  filter(search_n %in% c("random_8", "random_16", "random_32", "mbo_32", "defaults_8", "defaults_4")) %>%
+	  rename(aggrMeasure = aggr.meas)
 
-	frm = as.formula(stri_paste(aggr.meas, " ~  search_n| task.id", sep = ""))
+	frm = as.formula(stri_paste("aggrMeasure ~  search_n| task.id", sep = ""))
 	friedman.test(frm, data = dft)
-	ntst = PMCMRplus::frdAllPairsNemenyiTest(dft$auc.test.mean, dft$search_n, dft$task.id)
+	ntst = PMCMRplus::frdAllPairsNemenyiTest(dft[["aggrMeasure"]], dft$search_n, dft$task.id)
 
 	n.learners = length((unique(dft$search_n)))
 	n.tasks = length(unique(dft$task.id))
@@ -115,13 +120,14 @@ create_cdplot = function(learner) {
 
 	dd = dft %>%
 	 group_by(task.id) %>% 
-	 mutate(rnk = dense_rank(desc(auc.test.mean))) %>%
-	 select(rnk, task.id, search_n, auc.test.mean) %>%
+	 mutate(rnk = dense_rank(desc(aggrMeasure))) %>%
+	 select(rnk, task.id, search_n, aggrMeasure) %>%
 	 arrange(task.id) %>%
 	 group_by(search_n) %>%
 	 summarize(mean_rank = mean(rnk)) %>%
 	 mutate(right = mean_rank > median(mean_rank)) %>%
 	 mutate(yend = min_rank(mean_rank) - 0.75 + 0.1*row_number()) %>%
+	 mutate(yend = yend * 0.5) %>%
 	 mutate(yend = ifelse(yend < median(yend), yend, max(yend) - yend + 1)) %>%
 	 mutate(xend = ifelse(!right, 0L, max(mean_rank) + 1L)) %>%
 	 mutate(right = as.numeric(right))
@@ -172,9 +178,54 @@ create_cdplot = function(learner) {
 
 	p
 }
+
+
 library(patchwork)
 pcd = 
-(create_cdplot("Decision Tree") + xlab("")) /
-(create_cdplot("ElasticNet") + xlab("")) /
-(create_cdplot("Xgboost") + xlab("Average Rank"))
+	(create_cdplot(df, "Decision Tree") + xlab("")) /
+	(create_cdplot(df, "ElasticNet") + xlab("")) /
+	(create_cdplot(df, "Xgboost") + xlab("Average Rank"))
 ggsave("defaultLOOCV/cdplots.pdf", plot = pcd, height = 8, width = 4, scale = 1.35)
+
+
+### SKLEARN_DATA
+
+dfsklearn = lapply(list.files("results_sklearn", full.names = TRUE), read.csv) %>%
+ setNames(., stri_sub(list.files("results_sklearn"), to = -5)) %>%
+ bind_rows(., .id = "learner.id") %>%
+ rename(task.id = task_id) %>%
+ rename(acc.test.mean = evaluation) %>%
+ separate(strategy_name, c("search.type", "n"), "__") %>%
+ mutate(n = as.factor(n), 
+ 	search.type = factor(search.type, label = c("defaults", "random")),
+ 	learner.id = as.factor(learner.id),
+ 	search_n = as.factor(paste0(search.type, "_", n))) %>%
+ select(-X) %>% select(-configuration_specification) %>%
+ mutate(learner.short = learner.id)
+
+# Boxplots
+psklearnfull = dfsklearn %>%
+    mutate(n = factor(n, levels = c(1, 2, 4, 8, 16, 32))) %>%
+    mutate(search.type = factor(search.type,  levels = c("random", "defaults"))) %>%
+    filter(n != 64) %>%
+	ggplot(aes(x = n, y = acc.test.mean, fill = search.type)) +
+	geom_boxplot(outlier.alpha = 0.5) +
+	theme_bw() +
+	facet_wrap(~learner.short, nrow = 3, scales = "free_y") +
+	ylab("Area under the curve") +
+	xlab("Number of evaluations") +
+	labs(fill = "Seach strategy") +
+	theme(legend.position = "bottom")
+ggsave("defaultLOOCV/boxplots_sklearn_acc.pdf", plot = psklearnfull, height = 8, width = 4, scale = 1)
+
+
+
+
+## CD Plots
+
+pcd2 = (create_cdplot(dfsklearn, "adaboost", "acc.test.mean") + xlab("")) /
+	   (create_cdplot(dfsklearn, "random_forest", "acc.test.mean") + xlab("")) /
+	   (create_cdplot(dfsklearn, "libsvm_svc", "acc.test.mean") + xlab("Average Rank"))
+
+ggsave("defaultLOOCV/cdplots_sklearn.pdf", plot = pcd2, height = 6, width = 4, scale = 1.35)
+
