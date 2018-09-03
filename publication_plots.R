@@ -1,4 +1,4 @@
-packrat::off()
+# packrat::off()
 library(devtools)
 load_all()
 
@@ -15,7 +15,10 @@ df = readRDS("defaultLOOCV/full_results.Rds")$oob.perf %>%
 	filter(n %in% c(1, 2, 4, 8, 10, 16, 32, 64)) %>%
 	filter(learner.id != "classif.svm.tuned")
 
-
+df %>%
+ group_by(learner.short, search.type, n) %>% 
+ tally(n()) %>%
+ print(n = 44)
 
 
 # - GLMNET -------------------------------------------------------------
@@ -86,8 +89,6 @@ ggsave("defaultLOOCV/boxplots_auc_full.pdf", plot = pfull, height = 8, width = 4
 
 
 # Critical Differences
-
-
 
 create_cdplot = function(learner) {
 	mask = df %>% group_by(task.id) %>% summarize(n = n()) %>% arrange(desc(n)) %>% filter(n == 42)
@@ -172,7 +173,8 @@ create_cdplot = function(learner) {
 	p
 }
 library(patchwork)
-pcd = (create_cdplot("Decision Tree") + xlab("")) /
+pcd = 
+(create_cdplot("Decision Tree") + xlab("")) /
 (create_cdplot("ElasticNet") + xlab("")) /
 (create_cdplot("Xgboost") + xlab("Average Rank"))
 ggsave("defaultLOOCV/cdplots.pdf", plot = pcd, height = 8, width = 4, scale = 1.35)

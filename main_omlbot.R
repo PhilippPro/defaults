@@ -45,7 +45,8 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)])[1])
   # Create resampling train/test splits
   rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
-  registerDoMC(7)
+  parallelMap::parallelStartMulticore(10, level = "mlr.resample")
+  # registerDoMC(7)
 
   # ------------------------------------------------------------------------------------------------
   # Defaults
