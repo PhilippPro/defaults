@@ -1,0 +1,40 @@
+@relation 'readRDS(x)$defaults'
+@attribute 'bootstrap' {'True','False'}
+@attribute 'criterion' {'entropy','gini'}
+@attribute 'max_features' numeric
+@attribute 'min_leaf' numeric
+@attribute 'min_split' numeric
+@attribute 'strategy' {'mean','median','most_frequent'}
+@data
+"False","gini",0.164007071391679,1,10,"most_frequent"
+"True","gini",0.989534673646558,1,3,"median"
+"False","gini",0.0113237124565057,1,4,"median"
+"False","gini",0.285665731984191,1,2,"most_frequent"
+"False","entropy",0.568318063109182,1,2,"mean"
+"True","entropy",0.855285046240315,4,19,"mean"
+"True","gini",0.876760589184705,1,19,"most_frequent"
+"False","entropy",0.346419288555626,1,4,"mean"
+"False","entropy",0.0708803688152693,19,20,"median"
+"True","gini",0.0144661858561449,2,15,"median"
+"True","gini",0.548504773708992,7,20,"most_frequent"
+"True","entropy",0.991227003827225,1,20,"median"
+"False","entropy",0.998539247680455,1,20,"most_frequent"
+"False","entropy",0.345725535068195,1,10,"mean"
+"False","entropy",0.344352093115449,1,15,"mean"
+"False","entropy",0.445273038372397,8,2,"most_frequent"
+"False","gini",0.465803443363402,10,14,"most_frequent"
+"True","gini",0.859644739094656,19,13,"median"
+"False","entropy",0.383496295525692,1,7,"mean"
+"False","entropy",0.622146555213258,16,8,"mean"
+"True","entropy",0.0159287879569456,13,11,"most_frequent"
+"True","gini",0.508914151659701,1,14,"mean"
+"True","entropy",0.358994466881268,13,19,"mean"
+"False","gini",0.714068772667088,3,13,"median"
+"True","entropy",0.998666276135482,1,20,"median"
+"True","entropy",0.805792674438562,3,8,"median"
+"False","entropy",0.315445622277912,4,4,"most_frequent"
+"False","entropy",0.021961917176377,10,13,"most_frequent"
+"False","gini",0.912387664767448,2,2,"median"
+"False","entropy",0.344158535462338,1,12,"most_frequent"
+"False","entropy",0.841301372549497,17,13,"most_frequent"
+"True","entropy",0.614008332050871,17,2,"median"
