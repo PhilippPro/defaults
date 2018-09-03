@@ -222,7 +222,6 @@ ggsave("defaultLOOCV/boxplots_sklearn_acc.pdf", plot = psklearnfull, height = 8,
 
 
 ## CD Plots
-
 pcd2 = (create_cdplot(dfsklearn, "adaboost", "acc.test.mean") + xlab("")) /
 	   (create_cdplot(dfsklearn, "random_forest", "acc.test.mean") + xlab("")) /
 	   (create_cdplot(dfsklearn, "libsvm_svc", "acc.test.mean") + xlab("Average Rank"))

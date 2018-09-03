@@ -48,6 +48,7 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
     # In an Wrapper that selects the best default:
     lrn = setPredictType(lrn, "prob")
 
+    options(on.learner.error = "warn")
     # Loop over Hold-Out Datasets
     res = lapply(seq_len(length(tasks)), function(i) {
 
