@@ -106,6 +106,8 @@ create_cdplot = function(df, learner, aggr.meas = "auc.test.mean") {
 	  filter(search_n %in% c("random_8", "random_16", "random_32", "mbo_32", "defaults_8", "defaults_4")) %>%
 	  rename(aggrMeasure = aggr.meas)
 
+	 sprintf("Creating cd-plot for %s on %i datasets", learner, length(unique(dft$task.id)))
+
 	frm = as.formula(stri_paste("aggrMeasure ~  search_n| task.id", sep = ""))
 	friedman.test(frm, data = dft)
 	ntst = PMCMRplus::frdAllPairsNemenyiTest(dft[["aggrMeasure"]], dft$search_n, dft$task.id)
@@ -125,10 +127,12 @@ create_cdplot = function(df, learner, aggr.meas = "auc.test.mean") {
 	 arrange(task.id) %>%
 	 group_by(search_n) %>%
 	 summarize(mean_rank = mean(rnk)) %>%
-	 mutate(right = mean_rank > median(mean_rank)) %>%
-	 mutate(yend = min_rank(mean_rank) - 0.75 + 0.1*row_number()) %>%
-	 mutate(yend = yend * 0.5) %>%
-	 mutate(yend = ifelse(yend < median(yend), yend, max(yend) - yend + 1)) %>%
+	 mutate(right = mean_rank >= median(mean_rank)) %>%
+	 mutate(yend = min_rank(mean_rank)) %>%
+	 mutate(yend = ifelse(yend <= median(yend), yend, max(yend) - yend + 1)) %>%
+	 mutate(yend = yend * 0.75) %>%
+	 arrange(mean_rank) %>%
+	 mutate(yend = ifelse(yend == lag(yend, -1), yend -0.3, yend)) %>%
 	 mutate(xend = ifelse(!right, 0L, max(mean_rank) + 1L)) %>%
 	 mutate(right = as.numeric(right))
 
@@ -151,7 +155,7 @@ create_cdplot = function(df, learner, aggr.meas = "auc.test.mean") {
 	p = p + geom_segment(aes_string("mean_rank", "yend", xend = "xend",
 	                          	  yend = "yend", color = "search_n"), size = 1)
 	p = p + geom_text(aes_string("xend", "yend", label = "search_n",
-	                             hjust = "right"), vjust = -1)
+	                             hjust = "right"), vjust = -.75)
 	p = p + xlab("Average Rank")
 	p = p + geom_segment(aes_string("xstart", "y", xend = "xend", yend = "y"),
 	                   data = nem.df, size = 2, color = "dimgrey", alpha = 0.9)
@@ -181,8 +185,7 @@ create_cdplot = function(df, learner, aggr.meas = "auc.test.mean") {
 
 
 library(patchwork)
-pcd = 
-	(create_cdplot(df, "Decision Tree") + xlab("")) /
+pcd = (create_cdplot(df, "Decision Tree") + xlab("")) /
 	(create_cdplot(df, "ElasticNet") + xlab("")) /
 	(create_cdplot(df, "Xgboost") + xlab("Average Rank"))
 ggsave("defaultLOOCV/cdplots.pdf", plot = pcd, height = 8, width = 4, scale = 1.35)
@@ -197,7 +200,7 @@ dfsklearn = lapply(list.files("results_sklearn", full.names = TRUE), read.csv) %
  rename(acc.test.mean = evaluation) %>%
  separate(strategy_name, c("search.type", "n"), "__") %>%
  mutate(n = as.factor(n), 
- 	search.type = factor(search.type, label = c("defaults", "random")),
+ 	search.type = factor(search.type, label = c("random", "defaults")),
  	learner.id = as.factor(learner.id),
  	search_n = as.factor(paste0(search.type, "_", n))) %>%
  select(-X) %>% select(-configuration_specification) %>%
@@ -222,7 +225,6 @@ ggsave("defaultLOOCV/boxplots_sklearn_acc.pdf", plot = psklearnfull, height = 8,
 
 
 ## CD Plots
-
 pcd2 = (create_cdplot(dfsklearn, "adaboost", "acc.test.mean") + xlab("")) /
 	   (create_cdplot(dfsklearn, "random_forest", "acc.test.mean") + xlab("")) /
 	   (create_cdplot(dfsklearn, "libsvm_svc", "acc.test.mean") + xlab("Average Rank"))
