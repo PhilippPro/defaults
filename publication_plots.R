@@ -29,12 +29,13 @@ glmnet = df %>%
 	mutate(learner.short = factor(learner.short, levels = unique(learner.short)[c(1, 2, 3)]))
 
 p1 = ggplot(glmnet, aes(x = n, y = auc.test.mean, fill = search.type)) +
-	geom_boxplot() +
+	geom_boxplot(width = 0.9, varwidth = TRUE) +
+	theme_bw() +
 	ylab("Area under the curve") +
 	xlab("Number of evaluations") +
 	labs(fill = "Seach strategy") +
 	facet_wrap(~learner.short) +
-	theme(legend.position = "none")
+	theme(legend.position = "top")
 
 ggsave("defaultLOOCV/boxplots_auc_glmnet.pdf", plot = p1, height = 3, width = 4, scale = 1)
 
@@ -47,7 +48,8 @@ rpart = df %>%
 	mutate(learner.short = factor(learner.short, levels = unique(learner.short)[c(1, 2, 3)]))
 
 p2 = ggplot(rpart, aes(x = n, y = auc.test.mean, fill = search.type)) +
-	geom_boxplot() +
+	geom_boxplot(width = 0.9, varwidth = TRUE) +
+	theme_bw() +
 	ylab("Area under the curve") +
 	xlab("Number of evaluations") +
 	facet_wrap(~learner.short) +
@@ -65,13 +67,14 @@ xgb = df %>%
 	mutate(learner.short = factor(learner.short, levels = unique(learner.short)[c(1, 2, 3)]))
 
 p3 = ggplot(xgb, aes(x = n, y = auc.test.mean, fill = search.type)) +
-	geom_boxplot() +
+	geom_boxplot(width = 0.9, varwidth = TRUE) +
 	theme_bw() +
 	ylab("Area under the curve") +
 	xlab("Number of evaluations") +
 	labs(fill = "Seach strategy") +
 	facet_wrap(~learner.short) +
-	theme(legend.position = "none") %>%
+	theme(legend.position = "none")
+
 ggsave("defaultLOOCV/boxplots_auc_xgboost.pdf", plot = p3, height = 3, width = 4, scale = 1)
 
 # - All three ----------------------------------------------------------
@@ -226,51 +229,54 @@ rf = dfsklearn %>%
     filter(n != 64) %>%
     filter(learner.id == "random_forest")
 
-p1 = ggplot(rf, aes(x = n, y = acc.test.mean, fill = search.type)) +
+p1.2 = ggplot(rf, aes(x = n, y = acc.test.mean, fill = search.type)) +
 	geom_boxplot() +
+	theme_bw() +
 	ylab("Accuracy") +
 	xlab("Number of evaluations") +
 	labs(fill = "Seach strategy") +
 	facet_wrap(~learner.short) +
 	theme(legend.position = "none")
 
-ggsave("defaultLOOCV/boxplots_auc_glmnet.pdf", plot = p1, height = 3, width = 4, scale = 1)
+ggsave("defaultLOOCV/boxplots_acc_rf.pdf", plot = p1.2, height = 3, width = 4, scale = 1)
 
 
 # - RPART ------------------------------------------------------------
-rpart = dfsklearn %>%
+svm = dfsklearn %>%
     mutate(n = factor(n, levels = c(1, 2, 4, 8, 16, 32))) %>%
     mutate(search.type = factor(search.type,  levels = c("random", "defaults"))) %>%
     filter(n != 64) %>%
-    filter(learner.id == "")
+    filter(learner.id == "libsvm_svc")
 
-p2 = ggplot(rpart, aes(x = n, y = auc.test.mean, fill = search.type)) +
+p2.2 = ggplot(svm, aes(x = n, y = acc.test.mean, fill = search.type)) +
 	geom_boxplot() +
+	theme_bw() +
 	ylab("Area under the curve") +
 	xlab("Number of evaluations") +
 	facet_wrap(~learner.short) +
 	theme(legend.position = "none")
 
-ggsave("defaultLOOCV/boxplots_auc_rpart.pdf", plot = p2, height = 3, width = 4, scale = 1)
+ggsave("defaultLOOCV/boxplots_acc_svm_svc.pdf", plot = p2.2 , height = 3, width = 4, scale = 1)
 
 
 
 # - XGBOOST - ----------------------------------------------------------
-xgb = dfsklearn %>%
+ada = dfsklearn %>%
     mutate(n = factor(n, levels = c(1, 2, 4, 8, 16, 32))) %>%
     mutate(search.type = factor(search.type,  levels = c("random", "defaults"))) %>%
     filter(n != 64) %>%
-    filter(learner.id == "")
+    filter(learner.id == "adaboost")
 
-p3 = ggplot(xgb, aes(x = n, y = auc.test.mean, fill = search.type)) +
+p3.2 = ggplot(ada, aes(x = n, y = acc.test.mean, fill = search.type)) +
 	geom_boxplot() +
 	theme_bw() +
 	ylab("Area under the curve") +
 	xlab("Number of evaluations") +
 	labs(fill = "Seach strategy") +
 	facet_wrap(~learner.short) +
-	theme(legend.position = "none") %>%
-ggsave("defaultLOOCV/boxplots_auc_xgboost.pdf", plot = p3, height = 3, width = 4, scale = 1)
+	theme(legend.position = "none")
+
+ggsave("defaultLOOCV/boxplots_acc_adaboost.pdf", plot = p3.2, height = 3, width = 4, scale = 1)
 
 
 # Boxplots all

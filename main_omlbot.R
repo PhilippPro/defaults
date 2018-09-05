@@ -37,7 +37,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   # Forward selection ----------------------------------------------------------------------------------
   files = list.files("surrogates")[grep(x = list.files("surrogates"), pattern = "_regr.*_classif")]
   # for(i in c(2)) { # seq_along(learner.names)
-  i = 6
+  i = 2
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
 
@@ -46,7 +46,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   # Create resampling train/test splits
   rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
   parallelMap::parallelStartMulticore(10, level = "mlr.resample")
-  registerDoMC(3)
+  registerDoMC(2)
 
   # ------------------------------------------------------------------------------------------------
   # Defaults
