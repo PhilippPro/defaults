@@ -198,13 +198,13 @@ ggsave(filename = "evalAggrFuns/boxplot_compare_search_by_learner.png", plot = p
 p3.2 = df %>%
   group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
   summarize(auc.scaled = mean(auc.scaled)) %>%
-  filter(n %in% c(1, 2, 4, 8, 16, 32)) %>%
+  filter(n %in% c(1, 2, 4, 8, 16, 32, 64, 128, 256)) %>%
   filter(aggrFun %in% c("median", "random")) %>%
-  filter(learner.id %in% c("svm", "xgboost")) %>%
+  filter(learner.id %in% c("glmnet", "xgboost")) %>%
   group_by(learner.id, task.id) %>%
   mutate(n = as.factor(n)) %>%
-  ggplot(aes(x = n, y = auc.scaled, color = search.type)) +
-  geom_boxplot() +
+  ggplot(aes(x = n, y = auc.scaled, fill = search.type)) +
+  geom_boxplot(varwidth = TRUE) +
   scale_color_brewer(type = "div", palette = "Set2") +
   theme_bw() +
   facet_wrap(~learner.id, scales = "free_y") +
@@ -212,7 +212,7 @@ p3.2 = df %>%
   ylab("Normalized Area under the Curve") +
   xlab("No. evaluations") +
   labs(color = "Search method")
-ggsave(filename = "evalAggrFuns/boxplot2learners.pdf", plot = p3.2)
+ggsave(filename = "evalAggrFuns/boxplot2learners.pdf", plot = p3.2, width = 4, height = 4)
 
 p = df %>%
  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
