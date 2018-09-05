@@ -46,7 +46,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   # Create resampling train/test splits
   rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
   parallelMap::parallelStartMulticore(10, level = "mlr.resample")
-  registerDoMC(1)
+  registerDoMC(3)
 
   # ------------------------------------------------------------------------------------------------
   # Defaults
@@ -87,7 +87,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   # Evaluate random search on OOB-Tasks on OpenML
   n.rs   = c(4, 8, 16, 32, 64)
   rs.res = foreach(it = seq_len(rin$desc$iters)) %:%
-    foreach(n = n.rs) %dopar% {
+    foreach(n = sn.rs) %dopar% {
       evalRandomSearchOpenML(
         task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
         lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
