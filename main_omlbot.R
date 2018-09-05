@@ -37,7 +37,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   # Forward selection ----------------------------------------------------------------------------------
   files = list.files("surrogates")[grep(x = list.files("surrogates"), pattern = "_regr.*_classif")]
   # for(i in c(2)) { # seq_along(learner.names)
-  i = 2
+  i = 6
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
 
@@ -46,7 +46,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   # Create resampling train/test splits
   rin = makeResampleInstance(makeResampleDesc("CV", iters = 38), size = length(surrogates$surrogates))
   parallelMap::parallelStartMulticore(10, level = "mlr.resample")
-  registerDoMC(2)
+  registerDoMC(1)
 
   # ------------------------------------------------------------------------------------------------
   # Defaults
@@ -73,7 +73,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   defs = readRDS(defs.file)
 
   n.defs = c(1, 2, 4, 8, 16, 32)
-  def.res = foreach(it = seq_len(rin$desc$iters)[-30]) %:%
+  def.res = foreach(it = seq_len(rin$desc$iters)) %:%
     foreach(n = n.defs) %dopar% {
       evalDefaultsOpenML(
         task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
@@ -85,9 +85,9 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
     }
     
   # Evaluate random search on OOB-Tasks on OpenML
-  n.rs   = c(4, 8, 16, 32, 64)
+  n.rs   = c(1, 2, 4, 8, 16, 32, 64)
   rs.res = foreach(it = seq_len(rin$desc$iters)) %:%
-    foreach(n = sn.rs) %dopar% {
+    foreach(n = n.rs) %dopar% {
       evalRandomSearchOpenML(
         task.ids = names(surrogates$surrogates[rin$test.inds[[it]]]),
         lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),

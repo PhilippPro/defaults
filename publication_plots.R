@@ -12,7 +12,10 @@ df = readRDS("defaultLOOCV/full_results.Rds")$oob.perf %>%
 	filter(!(task.id %in% c("nomao", "Bioresponse"))) %>%
 	filter(search.type %in% c("random", "defaults", "mbo")) %>% 
 	filter(n %in% c(1, 2, 4, 8, 10, 16, 32, 64)) %>%
-	filter(learner.id != "classif.svm.tuned")
+	filter(learner.id != "classif.svm.tuned") %>%
+	group_by(task.id, learner.id) %>%
+ 	mutate(auc.test.mean = (auc.test.mean - min(auc.test.mean, na.rm = TRUE)) /
+  		(max(auc.test.mean, na.rm = TRUE) - min(auc.test.mean, na.rm = TRUE)))
 
 df %>%
  group_by(learner.short, search.type, n) %>% 
@@ -31,7 +34,7 @@ glmnet = df %>%
 p1 = ggplot(glmnet, aes(x = n, y = auc.test.mean, fill = search.type)) +
 	geom_boxplot(width = 0.9, varwidth = TRUE) +
 	theme_bw() +
-	ylab("Area under the curve") +
+	ylab("Normalized AUC") +
 	xlab("Number of evaluations") +
 	labs(fill = "Seach strategy") +
 	facet_wrap(~learner.short) +
@@ -50,7 +53,7 @@ rpart = df %>%
 p2 = ggplot(rpart, aes(x = n, y = auc.test.mean, fill = search.type)) +
 	geom_boxplot(width = 0.9, varwidth = TRUE) +
 	theme_bw() +
-	ylab("Area under the curve") +
+	ylab("Normalized AUC") +
 	xlab("Number of evaluations") +
 	facet_wrap(~learner.short) +
 	theme(legend.position = "none")
@@ -69,7 +72,7 @@ xgb = df %>%
 p3 = ggplot(xgb, aes(x = n, y = auc.test.mean, fill = search.type)) +
 	geom_boxplot(width = 0.9, varwidth = TRUE) +
 	theme_bw() +
-	ylab("Area under the curve") +
+	ylab("Normalized AUC") +
 	xlab("Number of evaluations") +
 	labs(fill = "Seach strategy") +
 	facet_wrap(~learner.short) +
@@ -171,10 +174,10 @@ create_cdplot = function(df, learner, aggr.meas = "auc.test.mean") {
 	                   data = nem.df, size = 2, color = "dimgrey", alpha = 0.9)
 	p = p + annotate("text",
 	               label = stri_paste("Critical Difference =", round(cd.nemenyi, 2), sep = " "),
-	               y =  max(dd$yend) - .2, x = mean(dd$mean_rank) / 2)
+	               y =  max(dd$yend) - .1, x = mean(dd$mean_rank))
 	p = p + annotate("segment",
-	               x =  mean(dd$mean_rank) / 2 - 0.5 * cd.nemenyi,
-	               xend = mean(dd$mean_rank) / 2 + 0.5 * cd.nemenyi,
+	               x =  mean(dd$mean_rank)- 0.5 * cd.nemenyi,
+	               xend = mean(dd$mean_rank) + 0.5 * cd.nemenyi,
 	               y = max(dd$yend) - .3,
 	               yend = max(dd$yend) - .3,
 	               size = 2L)
@@ -199,7 +202,7 @@ library(patchwork)
 pcd = (create_cdplot(df, "Decision Tree") + xlab("")) /
 	(create_cdplot(df, "ElasticNet") + xlab("")) /
 	(create_cdplot(df, "Xgboost") + xlab("Average Rank"))
-ggsave("defaultLOOCV/cdplots.pdf", plot = pcd, height = 6, width = 4, scale = 1.35)
+ggsave("defaultLOOCV/cdplots.pdf", plot = pcd, height = 4, width = 4, scale = 1.35)
 
 
 
@@ -216,27 +219,31 @@ dfsklearn = lapply(list.files("results_sklearn", full.names = TRUE), read.csv) %
  rename(acc.test.mean = evaluation) %>%
  separate(strategy_name, c("search.type", "n"), "__") %>%
  mutate(n = as.factor(n)) %>%
- mutate(search.type = factor(search.type, label = c("defaults", "random"))) %>%
  mutate(learner.id = as.factor(learner.id)) %>%
  mutate(search_n = as.factor(paste0(search.type, "_", n))) %>%
  select(-X) %>%
+ mutate(search.type = ifelse(search.type == "greedy", "defaults", "random")) %>%
  mutate(learner.short = learner.id)
+
 
 # - random Forest -------------------------------------------------------------
 rf = dfsklearn %>%
     mutate(n = factor(n, levels = c(1, 2, 4, 8, 16, 32))) %>%
-    mutate(search.type = factor(search.type,  levels = c("random", "defaults"))) %>%
     filter(n != 64) %>%
-    filter(learner.id == "random_forest")
+    filter(learner.id == "random_forest") %>%
+    group_by(task.id, learner.id) %>%
+ 	mutate(acc.test.mean = (acc.test.mean - min(acc.test.mean, na.rm = TRUE)) /
+  		(max(acc.test.mean, na.rm = TRUE) - min(acc.test.mean, na.rm = TRUE)))
 
 p1.2 = ggplot(rf, aes(x = n, y = acc.test.mean, fill = search.type)) +
-	geom_boxplot() +
+	geom_boxplot(width = 0.6) +
 	theme_bw() +
-	ylab("Accuracy") +
+	ylab("Normalized Accuracy") +
 	xlab("Number of evaluations") +
 	labs(fill = "Seach strategy") +
 	facet_wrap(~learner.short) +
-	theme(legend.position = "none")
+	theme(legend.position = "none") + 
+	scale_fill_manual(values = hue_pal()(3)[c(1,3)])
 
 ggsave("defaultLOOCV/boxplots_acc_rf.pdf", plot = p1.2, height = 3, width = 4, scale = 1)
 
@@ -244,17 +251,20 @@ ggsave("defaultLOOCV/boxplots_acc_rf.pdf", plot = p1.2, height = 3, width = 4, s
 # - RPART ------------------------------------------------------------
 svm = dfsklearn %>%
     mutate(n = factor(n, levels = c(1, 2, 4, 8, 16, 32))) %>%
-    mutate(search.type = factor(search.type,  levels = c("random", "defaults"))) %>%
     filter(n != 64) %>%
-    filter(learner.id == "libsvm_svc")
+    filter(learner.id == "libsvm_svc") %>%
+    group_by(task.id, learner.id) %>%
+ 	mutate(acc.test.mean = (acc.test.mean - min(acc.test.mean, na.rm = TRUE)) /
+  		(max(acc.test.mean, na.rm = TRUE) - min(acc.test.mean, na.rm = TRUE)))
 
 p2.2 = ggplot(svm, aes(x = n, y = acc.test.mean, fill = search.type)) +
 	geom_boxplot() +
 	theme_bw() +
-	ylab("Area under the curve") +
+	ylab("Normalized Accuracy") +
 	xlab("Number of evaluations") +
 	facet_wrap(~learner.short) +
-	theme(legend.position = "none")
+	theme(legend.position = "none") + 
+	scale_fill_manual(values = hue_pal()(3)[c(1,3)])
 
 ggsave("defaultLOOCV/boxplots_acc_svm_svc.pdf", plot = p2.2 , height = 3, width = 4, scale = 1)
 
@@ -263,18 +273,21 @@ ggsave("defaultLOOCV/boxplots_acc_svm_svc.pdf", plot = p2.2 , height = 3, width 
 # - XGBOOST - ----------------------------------------------------------
 ada = dfsklearn %>%
     mutate(n = factor(n, levels = c(1, 2, 4, 8, 16, 32))) %>%
-    mutate(search.type = factor(search.type,  levels = c("random", "defaults"))) %>%
     filter(n != 64) %>%
-    filter(learner.id == "adaboost")
+    filter(learner.id == "adaboost") %>%
+    group_by(task.id, learner.id) %>%
+ 	mutate(acc.test.mean = (acc.test.mean - min(acc.test.mean, na.rm = TRUE)) /
+  		(max(acc.test.mean, na.rm = TRUE) - min(acc.test.mean, na.rm = TRUE)))
 
 p3.2 = ggplot(ada, aes(x = n, y = acc.test.mean, fill = search.type)) +
 	geom_boxplot() +
 	theme_bw() +
-	ylab("Area under the curve") +
+	ylab("Normalized Accuracy") +
 	xlab("Number of evaluations") +
 	labs(fill = "Seach strategy") +
 	facet_wrap(~learner.short) +
-	theme(legend.position = "none")
+	theme(legend.position = "none") + 
+	scale_fill_manual(values = hue_pal()(3)[c(1,3)])
 
 ggsave("defaultLOOCV/boxplots_acc_adaboost.pdf", plot = p3.2, height = 3, width = 4, scale = 1)
 
