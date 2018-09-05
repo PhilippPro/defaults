@@ -1,5 +1,5 @@
 # Script used to evaluate the different aggregation functions on surrogate models
-
+packrat::off()
 library(devtools)     # load_all()
 library(stringi)      # string manipulation
 library(focussearch)  # Search the surrogates
@@ -24,12 +24,12 @@ fs.configs = data.frame(
   reps = c(1, 5, 3)
 )
 
-registerDoParallel(30)
+registerDoParallel(7)
 # registerDoSEQ()
 
 foreach(i = seq_len(6)[-5][-3]) %:%
   foreach(aggrFun = c("mean", "hodges-lehmann", "design")) %:% # "avg.quantiles357", "avg.quantiles05595"
-    foreach(fs.config = seq_len(2)) %do% {
+    foreach(fs.config = 1) %do% {
 
 
     fs.cfg.string = paste0(fs.configs[fs.config, ], collapse = "_")
@@ -235,3 +235,47 @@ df %>%
  filter(cfg == "10000_1_1") %>%
  filter(n %in% c(1, 2, 4, 8, 16)) %>%
  filter(search.type == "random")
+
+
+
+registerDoParallel(12)
+foreach(i = seq_len(6)[-5][-3]) %do% {
+  aggrFun = c("mean")
+  fs.config = 1
+    
+    fs.cfg.string = paste0(fs.configs[fs.config, ], collapse = "_")
+    res.file = stringBuilder("evalAggrFuns/results", aggrFun, learner.names[i], paste0("bigit_", fs.cfg.string))
+    
+    if (!file.exists(res.file))  {
+      
+      catf("Learner: %s", learner.names[i])
+      set.seed(199 + i)
+      
+      # Read surrogates from Hard Drive
+      surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
+      
+      # Defaults
+      defs.file = stringBuilder("evalAggrFuns/defaults", aggrFun, learner.names[i], fs.cfg.string)[1]
+      n_datasets = length(surrogates$surrogates)
+      defs = readRDS(defs.file)
+      
+      # Evaluate random search on OOB-Tasks on OpenML
+      n.rs   = c(128, 256, 512)
+      rs.res.sur = foreach (z = seq_len(5), .combine = "bind_rows", .export = "surrogates") %:%
+        foreach(it = seq_len(n_datasets), .combine = "bind_rows", .export = "surrogates") %:%
+        foreach(n = n.rs, .combine = "bind_rows", .export = "surrogates") %dopar% {
+          evalRandomSearchSurrogates(
+            task.ids = names(surrogates$surrogates[it]),
+            lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
+            defaults = defs$defaults,
+            ps = surrogates$param.set,
+            it = it,
+            n = n)
+        }
+      rs.res.sur$aggrFun = "random"
+      rs.res.sur$cfg = "n_1_1"
+      def.res.sur = rs.res.sur
+      def.res.sur$learner.id = learner.names[i]
+      saveRDS(def.res.sur, file = res.file)
+    }
+  }
