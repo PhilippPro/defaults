@@ -63,8 +63,7 @@ evalOpenML = function(ctrl, task.ids, lrn, defaults, ps, it, n, overwrite = FALS
       }
       # Only use one thread for xbg
       if (getLearnerPackages(lrn) == "xgboost") {
-        lrn = setHyperPars(lrn, "nthread" = 1L)
-        defaults$nthread = 1L
+        lrn = setHyperPars(lrn, "nthread" = 3)
       }
       # Get Paramset on original scale, drop unused params
       # and make sure they are in the same order as the design
