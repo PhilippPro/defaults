@@ -205,6 +205,12 @@ pcd = (create_cdplot(df, "Decision Tree") + xlab("")) /
 ggsave("defaultLOOCV/cdplots.pdf", plot = pcd, height = 4, width = 4, scale = 1.35)
 
 
+pcd1 = (create_cdplot(df, "Decision Tree") + xlab(""))
+pcd2 = 	(create_cdplot(df, "ElasticNet") + xlab(""))
+pcd3 = 	(create_cdplot(df, "Xgboost") + xlab("Average Rank"))
+ggsave("defaultLOOCV/cdplots_rpart.pdf", plot = pcd1, height = 4/3, width = 4, scale = 1.35)
+ggsave("defaultLOOCV/cdplots_glmnet.pdf", plot = pcd2, height = 4/3, width = 4, scale = 1.35)
+ggsave("defaultLOOCV/cdplots_xgboost.pdf", plot = pcd3, height = 4/3, width = 4, scale = 1.35)
 
 
 
@@ -317,6 +323,14 @@ pcd2 = (create_cdplot(dfsklearn, "adaboost", "acc.test.mean") + xlab("")) /
 	   (create_cdplot(dfsklearn, "libsvm_svc", "acc.test.mean") + xlab("Average Rank"))
 
 ggsave("defaultLOOCV/cdplots_sklearn.pdf", plot = pcd2, height = 4, width = 4, scale = 1.35)
+
+pcd1 =  (create_cdplot(dfsklearn, "adaboost", "acc.test.mean") + xlab("")) 
+pcd2 = 	(create_cdplot(dfsklearn, "random_forest", "acc.test.mean") + xlab("")) 
+pcd3 = 	(create_cdplot(dfsklearn, "libsvm_svc", "acc.test.mean") + xlab("Average Rank"))
+ggsave("defaultLOOCV/cdplots_adaboost.pdf", plot = pcd1, height = 4/3, width = 3.8, scale = 1.3)
+ggsave("defaultLOOCV/cdplots_rf.pdf", plot = pcd2, height = 4/3, width = 3.8, scale = 1.3)
+ggsave("defaultLOOCV/cdplots_svm.pdf", plot = pcd3, height = 4/3, width = 3.8, scale = 1.3)
+
 
 # CSV with results
 # Produce new boxplots

@@ -121,7 +121,7 @@ df$learner.id = factor(df$learner.id, labels = c("glmnet", "rpart", "svm", "xgbo
 saveRDS(df,  "evalAggrFuns/aggrFunsResult.RDS")
 
 df = readRDS("evalAggrFuns/aggrFunsResult.RDS")
-df$learner.id = factor(df$learner.id, labels = c("glmnet", "rpart", "svm", "xgboost"))
+# df$learner.id = factor(df$learner.id, labels = c("glmnet", "rpart", "svm", "xgboost"))
 library(ggplot2)
 library(hrbrthemes)
 
@@ -182,7 +182,7 @@ p3 = df %>%
  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
  summarize(auc.scaled = mean(auc.scaled)) %>%
  filter(n %in% c(1, 2, 4, 8, 16, 32)) %>%
- filter(aggrFun %in% c("median", "random")) %>%
+ filter(aggrFun %in% c("defaults", "random")) %>%
  group_by(learner.id, task.id) %>%
  mutate(n = as.factor(n)) %>%
  ggplot(aes(x = n, y = auc.scaled, color = search.type)) +
@@ -198,21 +198,21 @@ ggsave(filename = "evalAggrFuns/boxplot_compare_search_by_learner.png", plot = p
 p3.2 = df %>%
   group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
   summarize(auc.scaled = mean(auc.scaled)) %>%
-  filter(n %in% c(1, 2, 4, 8, 16, 32, 64, 128, 256)) %>%
-  filter(aggrFun %in% c("median", "random")) %>%
+  filter(n %in% c(1, 2, 4, 8, 16, 32, 512)) %>%
+  filter(aggrFun %in% c("design", "random")) %>%
   filter(learner.id %in% c("glmnet", "xgboost")) %>%
   group_by(learner.id, task.id) %>%
   mutate(n = as.factor(n)) %>%
   ggplot(aes(x = n, y = auc.scaled, fill = search.type)) +
   geom_boxplot(varwidth = TRUE) +
-  scale_color_brewer(type = "div", palette = "Set2") +
+  scale_fill_brewer(type = "div", palette = "Set1") +
   theme_bw() +
   facet_wrap(~learner.id, scales = "free_y") +
   theme(legend.position="bottom") +
   ylab("Normalized Area under the Curve") +
   xlab("No. evaluations") +
   labs(color = "Search method")
-ggsave(filename = "evalAggrFuns/boxplot2learners.pdf", plot = p3.2, width = 4, height = 4)
+ggsave(filename = "evalAggrFuns/boxplot2learners.pdf", plot = p3.2, width = 5, height = 3)
 
 p = df %>%
  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%

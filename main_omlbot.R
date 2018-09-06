@@ -85,7 +85,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
     }
     
   # Evaluate random search on OOB-Tasks on OpenML
-  n.rs   = c(1, 2, 4, 8, 16, 32, 64)
+  n.rs   = c(1, 2, 4, 8, 16, 32, 64)[1:2]
   rs.res = foreach(it = seq_len(rin$desc$iters)) %:%
     foreach(n = n.rs) %dopar% {
       evalRandomSearchOpenML(
