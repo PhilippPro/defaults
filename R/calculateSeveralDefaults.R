@@ -15,12 +15,13 @@ searchDefaults = function(surrogates_train, par.set, n.defaults = 10, probs = 0.
   # Compute n.defaults  default parameters iteratively
   # Earlier found defaults influence later performances
   for (j in seq_len(n.defaults)) {
-    if (stri_detect_fixed(probs, "cycle")) {
-      # Cycle through different results
-      cycle.probs = c(0.5, 0.9, 0.1)
 
-      pfun = makeObjFunction(surrogates_train, cycle.probs[(j %% 3) + 1])
-    }
+    # This is only used in the "cycle" experiment:
+    # if (stri_detect_fixed(probs, "cycle")) {
+    #  # Cycle through different results
+    #  cycle.probs = c(0.5, 0.9, 0.1)
+    #  pfun = makeObjFunction(surrogates_train, cycle.probs[(j %% 3) + 1])
+    # }
 
     # Search for optimal points given previous defaults
     z = focusSearchDefaults(pfun, surrogates_train, par.set, defaults.perf = defaults.perf, fs.config)
@@ -52,10 +53,6 @@ makeObjFunction = function(surrogates_train, probs) {
       quantile(parmin, probs = probs)
     } else if (probs == "mean") {
       mean(parmin)
-    } else if (probs == "avg.quantiles357") {
-      mean(quantile(parmin, probs = c(0.3, 0.5, 0.7)))
-    } else if (probs == "avg.quantiles05595") {
-      mean(quantile(parmin, probs = c(0.05, 0.5, 0.95)))
     } else if (probs == "hodges-lehmann") {
       0.33 * max(parmin) + 0.67 * mean(parmin)
     }
@@ -82,9 +79,9 @@ makeObjFunction = function(surrogates_train, probs) {
 # @param defaults.perf = performances of defaults 1, ..., n-1.
 focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf, fs.config = NULL) {
 
-  # Do the focussearch
+  # Do the focussearch.
   if (is.null(fs.config)) {
-    ctrl = makeFocusSearchControl(maxit = 10, restarts = 1, points = 10^4)
+    ctrl = makeFocusSearchControl(maxit = 10, restarts = 1, points = 5*10^4)
   } else {
     ctrl = makeFocusSearchControl(maxit = fs.config[1, 2], restarts = fs.config[1, 3], points = fs.config[1, 1])
   }
@@ -113,8 +110,9 @@ getDefaultPerfs = function(surrogates, defaults.params, train.inds = train_split
   # Predict on each split
   prd = sapply(surrogates, function(x) {predict(x, newdata = defaults.params)$data$response})
   prd = as.data.frame(prd)
-  colnames(prd) = ifelse(colnames(prd) %in% colnames(prd)[train.inds], paste0(colnames(prd), "_train"),
-                         paste0(colnames(prd), "_test"))
+  colnames(prd) = ifelse(colnames(prd) %in% colnames(prd)[train.inds],
+   paste0(colnames(prd), "_train"),
+   paste0(colnames(prd), "_test"))
   return(prd)
 }
 
@@ -145,57 +143,3 @@ randomSearch = function(surrogates, par.set, multiplier, points, seed = 199) {
   names(zs) = names(surrogates)
   return(zs)
 }
-
-
-
-
-
-# -------------------------------------------------------------------------------
-# Maybe use this later for CV
-
-# # Calculate LOOCV Performance of forward focusSearch
-# # @param surrogates Surrogate models
-# # @param n.defauls How many defaults
-# # @param probs Quantile to optimize
-# # @param houtsets Number of datasets to hold out
-# defaultCV = function(surrogates, n.defaults = 10, probs = 0.5, houtsets = 5, parallel = TRUE) {
-#   # Create CV Splits
-#   inds = seq_len(length(surrogates$surrogates))
-#   inds = split(inds, ceiling(seq_along(inds) / houtsets))
-#
-#   # Parallelize CV
-#   if (parallel) {
-#     parallelMap::parallelStartMulticore(8)
-#     lst = parallelMap::parallelLapply(inds, cvIter, surrogates, n.defaults, probs)
-#     parallelMap::parallelStop()
-#   } else {
-#     lst = lapply(inds, cvIter, surrogates, n.defaults, probs)
-#   }
-#
-#   # Extract relevant results (mean over OOB datasets)
-#   perfs = sapply(extractSubList(lst, "y"), function(x) {apply(x, 1, mean)})
-#   # cummulative min (we choose the best default from a set of n defaults)
-#   y.cummin = apply(perfs, 2, cummin)
-#   # Compute mean over resample iters
-#   y.mean = setNames(apply(y.cummin, 1, mean), paste0("def", seq_len(n.defaults)))
-#   catf("End LOOCV iter, y.mean: %s", paste0(y.mean, collapse = " "))
-#   return(list("y.mean" = y.mean, "params" = extractSubList(lst, "x"), "full.y" = perfs))
-# }
-#
-# # # Do a single Leave-One-Out CV Iteration
-# # @param i Surrogate id to drop in this iteration
-# # @param surrogates List of surrogates
-# # @param n.defaults How many defaults to learn
-# # @param probs Quantile we want to optimize
-# cvIter = function(i, surrogates, n.defaults, probs) {
-#   catf("CV iter: Datasets %s \n", paste0(min(i), ":", max(i), collapse = ""))
-#   # Do the forward search
-#   defaults.params = defaultForward(surrogates$surrogates[-i], surrogates$param.set, n.defaults, probs)
-#   # FIXME: How do we do the evaluation?
-#   # Now: On surrogate / Option b: On real task
-#   prd.hout = sapply(surrogates$surrogates[i], function(x) {
-#     predict(x, newdata = defaults.params)$data$response
-#   })
-#   return(list("y" = prd.hout, "x" = defaults.params))
-# }
-

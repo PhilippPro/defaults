@@ -29,10 +29,10 @@ getSkLearnParamsets = function() {
 }
 
 
-searchDefaultsOML100 = function(surrogates, par.set, n.defaults) {
+searchDefaultsOML100 = function(surrogates, par.set, n.defaults, fs.config = NULL) {
 
-  # Hardcode fs.config
-  fs.config = data.frame(iters = c(10^4), depth = c(1), reps = c(1))
+  # Hardcode default
+  fs.config = data.frame(iters = 5*10^4, depth = 1, reps = 10)
 
   # Create the objective function we want to optimize
   pfun = makeObjFunction(surrogates, 0.5)
@@ -47,7 +47,7 @@ searchDefaultsOML100 = function(surrogates, par.set, n.defaults) {
     # Search for optimal points given previous defaults
     z = focusSearchDefaults(pfun, surrogates,  par.set, defaults.perf = defaults.perf,
       fs.config)
-    catf("New best y: %f found for x: %s", z$y, paste0(z$x, collapse = ", "))
+    catf("Def %i: New best y: %f found for x: %s \n", j, z$y, paste0(z$x, collapse = ", "))
     # Add optimal point to defaults
     defaults.perf = cbind(defaults.perf, z$dsperfs)
     defaults.params = rbind(defaults.params, z$x)
