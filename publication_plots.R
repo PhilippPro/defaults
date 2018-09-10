@@ -205,6 +205,12 @@ pcd = (create_cdplot(df, "Decision Tree") + xlab("")) /
 ggsave("defaultLOOCV/cdplots.pdf", plot = pcd, height = 4, width = 4, scale = 1.35)
 
 
+pcd1 = (create_cdplot(df, "Decision Tree") + xlab(""))
+pcd2 = 	(create_cdplot(df, "ElasticNet") + xlab(""))
+pcd3 = 	(create_cdplot(df, "Xgboost") + xlab("Average Rank"))
+ggsave("defaultLOOCV/cdplots_rpart.pdf", plot = pcd1, height = 4/3, width = 4, scale = 1.35)
+ggsave("defaultLOOCV/cdplots_glmnet.pdf", plot = pcd2, height = 4/3, width = 4, scale = 1.35)
+ggsave("defaultLOOCV/cdplots_xgboost.pdf", plot = pcd3, height = 4/3, width = 4, scale = 1.35)
 
 
 
@@ -222,7 +228,8 @@ dfsklearn = lapply(list.files("results_sklearn", full.names = TRUE), read.csv) %
  mutate(learner.id = as.factor(learner.id)) %>%
  mutate(search_n = as.factor(paste0(search.type, "_", n))) %>%
  select(-X) %>%
- mutate(search.type = ifelse(search.type == "greedy", "defaults", "random")) %>%
+ mutate(search.type = ifelse(search.type == "greedy", "defaults", search.type)) %>%
+ mutate(search.type = ifelse(search.type == "random_search", "random", search.type)) %>%
  mutate(learner.short = learner.id)
 
 
@@ -243,7 +250,7 @@ p1.2 = ggplot(rf, aes(x = n, y = acc.test.mean, fill = search.type)) +
 	labs(fill = "Seach strategy") +
 	facet_wrap(~learner.short) +
 	theme(legend.position = "none") + 
-	scale_fill_manual(values = hue_pal()(3)[c(1,3)])
+	scale_fill_manual(values = hue_pal()(3)[c(1,2,3)])
 
 ggsave("defaultLOOCV/boxplots_acc_rf.pdf", plot = p1.2, height = 3, width = 4, scale = 1)
 
@@ -287,7 +294,7 @@ p3.2 = ggplot(ada, aes(x = n, y = acc.test.mean, fill = search.type)) +
 	labs(fill = "Seach strategy") +
 	facet_wrap(~learner.short) +
 	theme(legend.position = "none") + 
-	scale_fill_manual(values = hue_pal()(3)[c(1,3)])
+	scale_fill_manual(values = hue_pal()(3)[c(1,2,3)])
 
 ggsave("defaultLOOCV/boxplots_acc_adaboost.pdf", plot = p3.2, height = 3, width = 4, scale = 1)
 
@@ -316,6 +323,14 @@ pcd2 = (create_cdplot(dfsklearn, "adaboost", "acc.test.mean") + xlab("")) /
 	   (create_cdplot(dfsklearn, "libsvm_svc", "acc.test.mean") + xlab("Average Rank"))
 
 ggsave("defaultLOOCV/cdplots_sklearn.pdf", plot = pcd2, height = 4, width = 4, scale = 1.35)
+
+pcd1 =  (create_cdplot(dfsklearn, "adaboost", "acc.test.mean") + xlab("")) 
+pcd2 = 	(create_cdplot(dfsklearn, "random_forest", "acc.test.mean") + xlab("")) 
+pcd3 = 	(create_cdplot(dfsklearn, "libsvm_svc", "acc.test.mean") + xlab("Average Rank"))
+ggsave("defaultLOOCV/cdplots_adaboost.pdf", plot = pcd1, height = 4/3, width = 3.8, scale = 1.3)
+ggsave("defaultLOOCV/cdplots_rf.pdf", plot = pcd2, height = 4/3, width = 3.8, scale = 1.3)
+ggsave("defaultLOOCV/cdplots_svm.pdf", plot = pcd3, height = 4/3, width = 3.8, scale = 1.3)
+
 
 # CSV with results
 # Produce new boxplots

@@ -1,5 +1,5 @@
 # Script used to evaluate the different aggregation functions on surrogate models
-
+packrat::off()
 library(devtools)     # load_all()
 library(stringi)      # string manipulation
 library(focussearch)  # Search the surrogates
@@ -24,12 +24,12 @@ fs.configs = data.frame(
   reps = c(1, 5, 3)
 )
 
-registerDoParallel(30)
+registerDoParallel(7)
 # registerDoSEQ()
 
 foreach(i = seq_len(6)[-5][-3]) %:%
   foreach(aggrFun = c("mean", "hodges-lehmann", "design")) %:% # "avg.quantiles357", "avg.quantiles05595"
-    foreach(fs.config = seq_len(2)) %do% {
+    foreach(fs.config = 1) %do% {
 
 
     fs.cfg.string = paste0(fs.configs[fs.config, ], collapse = "_")
@@ -121,7 +121,7 @@ df$learner.id = factor(df$learner.id, labels = c("glmnet", "rpart", "svm", "xgbo
 saveRDS(df,  "evalAggrFuns/aggrFunsResult.RDS")
 
 df = readRDS("evalAggrFuns/aggrFunsResult.RDS")
-df$learner.id = factor(df$learner.id, labels = c("glmnet", "rpart", "svm", "xgboost"))
+# df$learner.id = factor(df$learner.id, labels = c("glmnet", "rpart", "svm", "xgboost"))
 library(ggplot2)
 library(hrbrthemes)
 
@@ -182,7 +182,7 @@ p3 = df %>%
  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
  summarize(auc.scaled = mean(auc.scaled)) %>%
  filter(n %in% c(1, 2, 4, 8, 16, 32)) %>%
- filter(aggrFun %in% c("median", "random")) %>%
+ filter(aggrFun %in% c("defaults", "random")) %>%
  group_by(learner.id, task.id) %>%
  mutate(n = as.factor(n)) %>%
  ggplot(aes(x = n, y = auc.scaled, color = search.type)) +
@@ -198,21 +198,21 @@ ggsave(filename = "evalAggrFuns/boxplot_compare_search_by_learner.png", plot = p
 p3.2 = df %>%
   group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
   summarize(auc.scaled = mean(auc.scaled)) %>%
-  filter(n %in% c(1, 2, 4, 8, 16, 32)) %>%
-  filter(aggrFun %in% c("median", "random")) %>%
-  filter(learner.id %in% c("svm", "xgboost")) %>%
+  filter(n %in% c(1, 2, 4, 8, 16, 32, 512)) %>%
+  filter(aggrFun %in% c("design", "random")) %>%
+  filter(learner.id %in% c("glmnet", "xgboost")) %>%
   group_by(learner.id, task.id) %>%
   mutate(n = as.factor(n)) %>%
-  ggplot(aes(x = n, y = auc.scaled, color = search.type)) +
-  geom_boxplot() +
-  scale_color_brewer(type = "div", palette = "Set2") +
+  ggplot(aes(x = n, y = auc.scaled, fill = search.type)) +
+  geom_boxplot(varwidth = TRUE) +
+  scale_fill_brewer(type = "div", palette = "Set1") +
   theme_bw() +
   facet_wrap(~learner.id, scales = "free_y") +
   theme(legend.position="bottom") +
   ylab("Normalized Area under the Curve") +
   xlab("No. evaluations") +
   labs(color = "Search method")
-ggsave(filename = "evalAggrFuns/boxplot2learners.pdf", plot = p3.2)
+ggsave(filename = "evalAggrFuns/boxplot2learners.pdf", plot = p3.2, width = 5, height = 3)
 
 p = df %>%
  group_by(task.id, search.type, aggrFun, n, cfg, learner.id) %>%
@@ -235,3 +235,47 @@ df %>%
  filter(cfg == "10000_1_1") %>%
  filter(n %in% c(1, 2, 4, 8, 16)) %>%
  filter(search.type == "random")
+
+
+
+registerDoParallel(12)
+foreach(i = seq_len(6)[-5][-3]) %do% {
+  aggrFun = c("mean")
+  fs.config = 1
+    
+    fs.cfg.string = paste0(fs.configs[fs.config, ], collapse = "_")
+    res.file = stringBuilder("evalAggrFuns/results", aggrFun, learner.names[i], paste0("bigit_", fs.cfg.string))
+    
+    if (!file.exists(res.file))  {
+      
+      catf("Learner: %s", learner.names[i])
+      set.seed(199 + i)
+      
+      # Read surrogates from Hard Drive
+      surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)]))
+      
+      # Defaults
+      defs.file = stringBuilder("evalAggrFuns/defaults", aggrFun, learner.names[i], fs.cfg.string)[1]
+      n_datasets = length(surrogates$surrogates)
+      defs = readRDS(defs.file)
+      
+      # Evaluate random search on OOB-Tasks on OpenML
+      n.rs   = c(128, 256, 512)
+      rs.res.sur = foreach (z = seq_len(5), .combine = "bind_rows", .export = "surrogates") %:%
+        foreach(it = seq_len(n_datasets), .combine = "bind_rows", .export = "surrogates") %:%
+        foreach(n = n.rs, .combine = "bind_rows", .export = "surrogates") %dopar% {
+          evalRandomSearchSurrogates(
+            task.ids = names(surrogates$surrogates[it]),
+            lrn = makeLearner(gsub(x = learner.names[i], "mlr.", "", fixed = TRUE)),
+            defaults = defs$defaults,
+            ps = surrogates$param.set,
+            it = it,
+            n = n)
+        }
+      rs.res.sur$aggrFun = "random"
+      rs.res.sur$cfg = "n_1_1"
+      def.res.sur = rs.res.sur
+      def.res.sur$learner.id = learner.names[i]
+      saveRDS(def.res.sur, file = res.file)
+    }
+  }

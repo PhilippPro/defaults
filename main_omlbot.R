@@ -85,7 +85,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
     }
 
   # Evaluate random search on OOB-Tasks on OpenML
-  n.rs   = c(1, 2, 4, 8, 16, 32, 64)
+  n.rs   = c(1, 2, 4, 8, 16, 32, 64)[1:2]
   rs.res = foreach(it = seq_len(rin$desc$iters)) %:%
     foreach(n = n.rs) %dopar% {
       evalRandomSearchOpenML(
@@ -174,6 +174,8 @@ ggsave(paste0("defaultLOOCV/auc.scaled_surrogates_defs_rs_", learner.names[i], "
 files = list.files("surrogates")[grep(x = list.files("surrogates"), pattern = "_regr.*_classif")]
 
 registerDoMC(5)
+
+# Read surrogates from Hard Drive
 overwrite = TRUE
 foreach(i = c(1, 2, 4, 5, 6)) %dopar% {
   catf("Learner: %s", learner.names[i])

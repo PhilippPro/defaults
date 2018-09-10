@@ -1,0 +1,12 @@
+name: defaults
+title: defaults
+username:
+account: anonymous-rabbit
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 422520
+bundleId: 1571624
+url: https://anonymous-rabbit.shinyapps.io/defaults/
+when: 1536187726.52604
+asMultiple: FALSE
+asStatic: FALSE
