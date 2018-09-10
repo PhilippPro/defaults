@@ -83,7 +83,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
         it = it,
         n = n)
     }
-    
+
   # Evaluate random search on OOB-Tasks on OpenML
   n.rs   = c(1, 2, 4, 8, 16, 32, 64)
   rs.res = foreach(it = seq_len(rin$desc$iters)) %:%
@@ -159,7 +159,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
 }
 
 
-
+# Quick viz
 p = bind_rows(rs.res.sur, def.res.sur) %>%
   ggplot(aes(y = auc.scaled, x = search.type, color = as.factor(n))) +
       geom_boxplot() +
@@ -167,69 +167,46 @@ p = bind_rows(rs.res.sur, def.res.sur) %>%
 ggsave(paste0("defaultLOOCV/auc.scaled_surrogates_defs_rs_", learner.names[i], ".png"), plot = p, scale = 1.5)
 
 
-# # Create Plots comparing to random search ------------------------------------------------------------
-# # Get the saved performances (either partial or full result)
-# results.file = stringBuilder("defaultLOOCV", "Q2_perf", learner.names[i])
-# if (file.exists(results.file)) {
-#   lst = readRDS(results.file)
-# } else {
-#   partial = lapply(list.files("defaultLOOCV/save", full.names = TRUE), readRDS)
-#   lst = list(oob.perf = do.call("bind_rows", partial) %>% filter(learner.id == "classif.xgboost.dummied.tuned"))
-# }
-#
-# library(ggpubr)
-# library(patchwork)
-#
-#   # Boxplot of the different methods
-#   p = ggboxplot(lst$oob.perf,
-#     x = "n", y = "auc.test.mean", color = "n",
-#     # palette = c("#00AFBB", "#E7B800", "#FC4E07", "#FC88BB"),
-#     add = "jitter") +
-#     ggtitle("Performance across all datasets") +
-#     facet_wrap(~search.type, scales = "free_x")
-#
-#   # Table with means and medians
-#   lst$oob.perf %>%
-#     group_by(task.id) %>%
-#     filter(search.type != "randomBotData") %>%
-#     mutate(
-#       rnk = dense_rank(desc(auc.test.mean)),
-#       mn = mean(auc.test.mean),
-#       med = median(auc.test.mean)) %>%
-#     ungroup() %>%
-#     group_by(search.type, n) %>%
-#     summarise(mean.ranks = mean(rnk), mean.means = mean(mn), mean.medians = mean(med))
-#
-#   # Boxplot comparing to default search
-#   gdata = lst$oob.perf %>%
-#     left_join(lst$oob.perf %>%
-#         filter(search.type == "defaults") %>%
-#         mutate(
-#           auc.def = auc.test.mean,
-#           acc.def = acc.test.join,
-#           f1.def = f1.test.mean
-#         ),
-#       by = c("task.id", "learner.id", "n.defaults")) %>%
-#     mutate(
-#       delta_auc = auc.test.mean.x - auc.def,
-#       delta_acc = acc.test.join.x - acc.def,
-#       delta_f1 = f1.test.mean.x - f1.def
-#     ) %>%
-#     filter(search.type.x != "defaults")
-#
-#   delta = switch(measure, "auc.test.mean" = "delta_auc", "acc.test.join" = "delta_acc", "f1.test.mean" = "delta_f1")
-#   # Boxplot Differences
-#   g = ggboxplot(gdata, x = "search.type.x", y = delta, color = "search.type.x",
-#     palette = c("#E7B800", "#FC4E07", "#FC88BB"),
-#     add = "jitter") +
-#     geom_abline(intercept = 0, slope = 0) +
-#     coord_cartesian(ylim = c(-0.4, max(gdata[delta]))) +
-#     ggtitle(stri_paste("Performance difference to defaults for ", measure))
-#
-#   # Create combined plot
-#   pg = (p + facet_grid(cols = vars(n.defaults))) / (g + facet_grid(cols = vars(n.defaults)))
-#   ggsave(pg, filename = paste0("defaultLOOCV/", measure, unique(lst$oob.perf$learner.id), "Q2", ".png"), scale = 3)
-# }
+
+
+#--------------------------------------------------------------------------------------------------
+# Compute default on full data
+files = list.files("surrogates")[grep(x = list.files("surrogates"), pattern = "_regr.*_classif")]
+
+registerDoMC(5)
+overwrite = TRUE
+foreach(i = c(1, 2, 4, 5, 6)) %dopar% {
+  catf("Learner: %s", learner.names[i])
+  set.seed(199 + i)
+
+  # Read surrogates from Hard Drive
+  surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)])[1])
+
+  # ------------------------------------------------------------------------------------------------
+  # Defaults
+  defs.file = stringBuilder("full_defaults", "median_defaults", learner.names[i])[1]
+  # Compute defaults if not yet available
+  if (!file.exists(defs.file) | overwrite) {
+    # Iterate over ResampleInstance and its indices
+    set.seed(199 + i)
+    # Search for defaults
+      defs = searchDefaults(
+        surrogates$surrogates, # training surrogates (L-1-Out-CV)
+        surrogates$param.set, # parameter space to search through
+        n.defaults = 32, # Number of defaults we want to find
+        probs = 0.5,
+        fs.config = data.frame(iters = 5*10^4, depth = 1, reps = 10))
+
+    # Save found defaults as RDS
+    saveRDS(list("defaults" = defs), defs.file)
+    farff::writeARFF(defs, paste0(stri_sub(defs.file, to = -5), "arff"))
+  }
+}
+
+defs.files = list.files("full_defaults", full.names = TRUE)
+sapply(defs.files,  function(x) {farff::writeARFF(readRDS(x)$defaults, paste0(stringi::stri_sub(x, to = -5), "arff"), overwrite = TRUE)})
+
+
 #--------------------------------------------------------------------------------------------------
 # Evaluate found defaults on complete holdout datasets,
 # for which surrogates are not even available
@@ -261,40 +238,3 @@ ggsave(paste0("defaultLOOCV/auc.scaled_surrogates_defs_rs_", learner.names[i], "
 #   }
 # oml.res = do.call("bind_rows", hout.res)
 # saveRDS(oml.res, "defaultLOOCV/HOUT_Q2_cubist_classif.rpart_auc_zscale_.RDS")
-
-
-# Compute default on full data
-files = list.files("surrogates")[grep(x = list.files("surrogates"), pattern = "_regr.*_classif")]
-
-registerDoMC(5)
-foreach(i = c(1, 2, 4, 5, 6)) %dopar% {
-  catf("Learner: %s", learner.names[i])
-  set.seed(199 + i)
-
-  # Read surrogates from Hard Drive
-  surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.names[i], from = 5), x = files)])[1])
-
-  # ------------------------------------------------------------------------------------------------
-  # Defaults
-  defs.file = stringBuilder("full_defaults", "median_defaults", learner.names[i])[1]
-  # Compute defaults if not yet available
-  if (!file.exists(defs.file)) {
-    # Iterate over ResampleInstance and its indices
-    set.seed(199 + i)
-    # Search for defaults
-      defs = searchDefaults(
-        surrogates$surrogates, # training surrogates (L-1-Out-CV)
-        surrogates$param.set, # parameter space to search through
-        n.defaults = 32, # Number of defaults we want to find
-        probs = 0.5,
-        fs.config = data.frame(iters = 5*10^4, depth = 1, reps = 1))
-
-    # Save found defaults as RDS
-    saveRDS(list("defaults" = defs), defs.file)
-    farff::writeARFF(defs, paste0(stri_sub(defs.file, to = -5), "arff"))
-  }
-}
-
-defs.files = list.files("full_defaults", full.names = TRUE)
-sapply(defs.files,  function(x) {farff::writeARFF(readRDS(x)$defaults, paste0(stringi::stri_sub(x, to = -5), "arff"))})
-

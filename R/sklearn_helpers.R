@@ -47,7 +47,7 @@ searchDefaultsOML100 = function(surrogates, par.set, n.defaults) {
     # Search for optimal points given previous defaults
     z = focusSearchDefaults(pfun, surrogates,  par.set, defaults.perf = defaults.perf,
       fs.config)
-    catf("New best y: %f found for x: %s", z$y, paste0(z$x, collapse = ", "))
+    catf("Def %i: New best y: %f found for x: %s \n", j, z$y, paste0(z$x, collapse = ", "))
     # Add optimal point to defaults
     defaults.perf = cbind(defaults.perf, z$dsperfs)
     defaults.params = rbind(defaults.params, z$x)

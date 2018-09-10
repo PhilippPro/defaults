@@ -9,6 +9,8 @@
 *.Rbuildignore
 *.arff
 *_gc.json
+defaults.sublime*
 results_sklearn/*
-packrat/lib*/
+packrat/lib*
 packrat/src/
+packrat/*
