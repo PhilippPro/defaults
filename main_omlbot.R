@@ -267,6 +267,9 @@ ggsave(paste0("defaultLOOCV/auc.scaled_surrogates_defs_rs_", learner.names[i], "
 files = list.files("surrogates")[grep(x = list.files("surrogates"), pattern = "_regr.*_classif")]
 
 registerDoMC(5)
+# Read surrogates from Hard Drive
+
+overwrite = TRUE
 foreach(i = c(1, 2, 4, 5, 6)) %dopar% {
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
@@ -278,7 +281,7 @@ foreach(i = c(1, 2, 4, 5, 6)) %dopar% {
   # Defaults
   defs.file = stringBuilder("full_defaults", "median_defaults", learner.names[i])[1]
   # Compute defaults if not yet available
-  if (!file.exists(defs.file)) {
+  if (!file.exists(defs.file) | overwrite) {
     # Iterate over ResampleInstance and its indices
     set.seed(199 + i)
     # Search for defaults
