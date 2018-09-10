@@ -98,18 +98,18 @@ sklearners = c("libsvm_svc", "adaboost", "random_forest")
 
 registerDoMC(3)
 # Compute defaults if not yet available
-    # Iterate over ResampleInstance and its indices
-    defs = foreach(sklearner = sklearners) %dopar% {
-      defs.file = paste0("full_defaults/median_defaults_sklearn_", sklearner, ".RDS")
-      set.seed(3999)
-      # Search for defaults
-      defs = searchDefaultsOML100(
-        surrogates[[sklearner]], # training surrogates (L-1-Out-CV)
-        param.set[[sklearner]], # parameter space to search through
-        n.defaults = 32)
-      saveRDS(list("defaults" = defs), defs.file)
-      return(defs)
-    }
+# Iterate over ResampleInstance and its indices
+defs = foreach(sklearner = sklearners) %dopar% {
+  defs.file = paste0("full_defaults/median_defaults_sklearn_", sklearner, ".RDS")
+  set.seed(3999)
+  # Search for defaults
+  defs = searchDefaultsOML100(
+    surrogates[[sklearner]], # training surrogates (L-1-Out-CV)
+    param.set[[sklearner]], # parameter space to search through
+    n.defaults = 32)
+  saveRDS(list("defaults" = defs), defs.file)
+  return(defs)
+}
 
 
 defs.files = paste0("full_defaults/median_defaults_sklearn_", sklearner, ".RDS")
