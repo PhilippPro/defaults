@@ -11,7 +11,7 @@ lrns = sapply(learner.names, makeLearner, predict.type = "prob")
 lrnMM = makeModelMultiplexer(lrns)
 psMM  = makeModelMultiplexerParamSet(lrnMM,
  "classif.glmnet" = lrn.ps[[1]], "classif.rpart" = lrn.ps[[2]], "classif.svm" = lrn.ps[[4]],
- "classif.ranger" = lrn.ps[[5]], "classif.xgboost" = lrn.ps[[6]]))
+ "classif.ranger" = lrn.ps[[5]], "classif.xgboost" = lrn.ps[[6]])
 
 list(lrn = lrnMM, ps = psMM)
 }

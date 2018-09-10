@@ -15,3 +15,4 @@ results_sklearn/*
 packrat/lib*
 packrat/src/
 packrat/*
+packrat/lib*/
