@@ -3,20 +3,27 @@
 # @param par.set Parameter set
 # @param n.defauls How many defaults
 # @param probs Quantile to optimize
-searchDefaults = function(surrogates_train, par.set, n.defaults = 10, probs = 0.5) {
-  
+searchDefaults = function(surrogates_train, par.set, n.defaults = 10, probs = 0.5, fs.config = NULL) {
+
   # Create the objective function we want to optimize
   pfun = makeObjFunction(surrogates_train, probs)
-  
+
   # Instantiate default parameters and respective performances
   defaults.perf = NULL
   defaults.params = NULL
-  
+
   # Compute n.defaults  default parameters iteratively
   # Earlier found defaults influence later performances
   for (j in seq_len(n.defaults)) {
+    if (stri_detect_fixed(probs, "cycle")) {
+      # Cycle through different results
+      cycle.probs = c(0.5, 0.9, 0.1)
+
+      pfun = makeObjFunction(surrogates_train, cycle.probs[(j %% 3) + 1])
+    }
+
     # Search for optimal points given previous defaults
-    z = focusSearchDefaults(pfun, surrogates_train, par.set, defaults.perf = defaults.perf)
+    z = focusSearchDefaults(pfun, surrogates_train, par.set, defaults.perf = defaults.perf, fs.config)
     catf("New best y: %f found for x: %s", z$y, paste0(z$x, collapse = ", "))
     # Add optimal point to defaults
     defaults.perf = cbind(defaults.perf, z$dsperfs)
@@ -26,24 +33,34 @@ searchDefaults = function(surrogates_train, par.set, n.defaults = 10, probs = 0.
 }
 
 
-# Create an objective function that only requires inputs x (algorithm hyperpars) and 
+# Create an objective function that only requires inputs x (algorithm hyperpars) and
 # defaults.perf (defaults found in earlier iterations)
 # @param surrogates List of surrogates
 # @param probs Quantile we want to optimize
 makeObjFunction = function(surrogates_train, probs) {
   force(surrogates)
   force(probs)
-  
-  # Helper function, that first computes the minimum over all 
+
+  # Helper function, that first computes the minimum over all
   # defaults and then the quantile. This is the core idea of reducing
-  # default search to a single number we can optimize
+  # default search to a single number , which can be optimized
   defaultsMinQuantile = function(x, defaults.perf, probs) {
     # Compute min of prd and defaults.perf for each dataset
     parmin = apply(cbind(x, defaults.perf), 1, min)
     # and compute quantile over the datasets
-    quantile(parmin, probs = probs)
+    if (is.numeric(probs)) {
+      quantile(parmin, probs = probs)
+    } else if (probs == "mean") {
+      mean(parmin)
+    } else if (probs == "avg.quantiles357") {
+      mean(quantile(parmin, probs = c(0.3, 0.5, 0.7)))
+    } else if (probs == "avg.quantiles05595") {
+      mean(quantile(parmin, probs = c(0.05, 0.5, 0.95)))
+    } else if (probs == "hodges-lehmann") {
+      0.33 * max(parmin) + 0.67 * mean(parmin)
+    }
   }
-  
+
   # Predict newdata, compute prediction
   function (x, defaults.perf = NULL) {
       # Compute predictions for each surrogate model
@@ -63,17 +80,21 @@ makeObjFunction = function(surrogates_train, probs) {
 # @param pfun Objective function
 # @param param.set Parameter set
 # @param defaults.perf = performances of defaults 1, ..., n-1.
-focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf) {
-  
+focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf, fs.config = NULL) {
+
   # Do the focussearch
-  ctrl = makeFocusSearchControl(maxit = 4, restarts = 4, points = 10^3)
+  if (is.null(fs.config)) {
+    ctrl = makeFocusSearchControl(maxit = 10, restarts = 1, points = 10^4)
+  } else {
+    ctrl = makeFocusSearchControl(maxit = fs.config[1, 2], restarts = fs.config[1, 3], points = fs.config[1, 1])
+  }
   # For debugging:
   # ctrl = makeFocusSearchControl(1, 1, points = 30)
-  
+
   # For knn search the full param space
-  if (getParamIds(param.set)[1] == "k") 
+  if (getParamIds(param.set)[1] == "k")
     ctrl = makeFocusSearchControl(maxit = 1, restarts = 2, points = 120)
-  
+
   z = focussearch(pfun, param.set, ctrl, defaults.perf = defaults.perf, show.info = FALSE)
   # Add performance on the individual datasets
   z$dsperfs = sapply(surrogates_train, function(m) {predict(m, newdata = z$x)$data$response})
@@ -87,12 +108,10 @@ focusSearchDefaults = function (pfun, surrogates_train, param.set, defaults.perf
 # @param n.defauls How many defaults
 # @param probs Quantile to optimize
 getDefaultPerfs = function(surrogates, defaults.params, train.inds = train_split()) {
-  
+
   # Which split do we want to predict on? (train or test datasets)
   # Predict on each split
-  prd = sapply(surrogates, function(x) {
-    predict(x, newdata = defaults.params)$data$response
-  })
+  prd = sapply(surrogates, function(x) {predict(x, newdata = defaults.params)$data$response})
   prd = as.data.frame(prd)
   colnames(prd) = ifelse(colnames(prd) %in% colnames(prd)[train.inds], paste0(colnames(prd), "_train"),
                          paste0(colnames(prd), "_test"))
@@ -132,18 +151,18 @@ randomSearch = function(surrogates, par.set, multiplier, points, seed = 199) {
 
 
 # -------------------------------------------------------------------------------
-# Maybe use this later for CV 
+# Maybe use this later for CV
 
 # # Calculate LOOCV Performance of forward focusSearch
 # # @param surrogates Surrogate models
 # # @param n.defauls How many defaults
 # # @param probs Quantile to optimize
 # # @param houtsets Number of datasets to hold out
-# defaultCV = function(surrogates, n.defaults = 10, probs = 0.5, houtsets = 5, parallel = TRUE) {  
+# defaultCV = function(surrogates, n.defaults = 10, probs = 0.5, houtsets = 5, parallel = TRUE) {
 #   # Create CV Splits
 #   inds = seq_len(length(surrogates$surrogates))
 #   inds = split(inds, ceiling(seq_along(inds) / houtsets))
-#   
+#
 #   # Parallelize CV
 #   if (parallel) {
 #     parallelMap::parallelStartMulticore(8)
@@ -152,7 +171,7 @@ randomSearch = function(surrogates, par.set, multiplier, points, seed = 199) {
 #   } else {
 #     lst = lapply(inds, cvIter, surrogates, n.defaults, probs)
 #   }
-#   
+#
 #   # Extract relevant results (mean over OOB datasets)
 #   perfs = sapply(extractSubList(lst, "y"), function(x) {apply(x, 1, mean)})
 #   # cummulative min (we choose the best default from a set of n defaults)
@@ -162,7 +181,7 @@ randomSearch = function(surrogates, par.set, multiplier, points, seed = 199) {
 #   catf("End LOOCV iter, y.mean: %s", paste0(y.mean, collapse = " "))
 #   return(list("y.mean" = y.mean, "params" = extractSubList(lst, "x"), "full.y" = perfs))
 # }
-# 
+#
 # # # Do a single Leave-One-Out CV Iteration
 # # @param i Surrogate id to drop in this iteration
 # # @param surrogates List of surrogates

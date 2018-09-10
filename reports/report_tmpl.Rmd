@@ -1,0 +1,163 @@
+---
+title: "Multiple Defaults Search Output"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Load the files
+loadd(learner.name_1)
+loadd(results_1)
+loadd(data_1)
+loadd(plots_1)
+loadd(learner.name_2)
+loadd(results_2)
+loadd(data_2)
+loadd(plots_2)
+loadd(learner.name_4)
+loadd(results_4)
+loadd(data_4)
+loadd(plots_4)
+loadd(learner.name_6)
+loadd(results_6)
+loadd(data_6)
+loadd(plots_6)
+
+# Overwrite learner.name = learner.name_1 etc.
+obj = c("learner.name", "results", "data", "plots")
+eval(parse(text = paste0(obj, " = ", obj, "_", j, ";")))
+```
+
+
+# `r learner.name`
+
+All plots indicate results from the learner `r learner.name`.
+
+**Current status: `r round(sum(data$cnt) / (nrow(data) * 36), 3) * 100` \% of results finished.**
+
+
+### Caveats
+
+- I could create the same plots for Accuracy, and F1 without any big additional effort if required.
+
+- The current analysis contains 36 / 38 datasets for which we have data from the randomBot.
+  I left out two datasets, because they take really long to evaluate (because they are very big).
+
+- The general process of selecting a best configuration using nested CV seems to be decently unstable, at 
+  least in the decision trees, we sometimes get worse by selecting a bigger subset of the learned defaults.
+  This is an interesting resarch subject in itself, but might influence our analysis.
+
+
+## Average rank 
+
+The following table contains the average rank, mean auc, normalized mean auc and median of auc across
+n = 36 hold-out datasets. 
+All results have been obtained using 10-fold CV splits from OpenML and 5-fold nested CV for 
+selecting a configuration in the multiple defaults and random-search case.
+
+Attention has been given to the **n** column, as $n < 36$ indicates missing results
+
+```{r, echo=FALSE}
+print(data)
+```
+
+
+## Comparison to randomSearch
+
+Boxplot of n found defaults (design) vs. package defaults and random search with design.
+
+**Left** Boxplot of performances using n = 2, 4, 6, 8, 10 complementary defaults
+
+**Mid** Package Defaults
+
+**Right** Randomsearch with n = 4, 8, 16, 32, 64 configurations randomly drawn from the parameter space.
+
+
+```{r, echo = FALSE}
+plots$p
+```
+
+
+## Comparison to n-fold randomSearch
+
+Boxplot of n (2, 4, 8) found defaults (design) vs. random search with $n \cdot 1,2,4,8$ times random search.
+Values $> 0$ indicate an improvement of randomsearch using multiples of n over obtained defaults.
+
+```{r, echo = FALSE}
+plots$nfold
+```
+
+## Comparison to randomBotdata
+
+Boxplot of minimum over n = 4, 8, 16, 32, 64 randomly sampled configurations from the randomBotdata.
+
+```{r, echo = FALSE}
+plots$r
+```
+
+
+## Delta comparison to package defaults
+This plot indicates the difference to package defaults measured in AUC.
+Values larger than 0 indicate improvement over package defaults.
+
+```{r, echo = FALSE, warning=FALSE}
+plots$g
+```
+
+
+## Plotting the ranks
+
+Plot containing the ranks of the different elements of the first table
+```{r, echo = FALSE, warning = FALSE}
+plots$rankplot
+```
+
+## Comparing different Aggregation functions:
+
+**design**: Aggregate using the median
+
+**default_mean**: Aggregate using the mean
+
+**default_cycle**: Aggregate cycling through the quantiles (0.7, 0.3 and 0.5)
+
+**hodges-lehmann**: Aggregate using the hodges-lehmann criterion (0.33  max() + 0.66  mean()).
+
+If the following table does not contain differnt **search.types**, this indicates that results have not yet been computed for this learner.
+
+*mn_auc_norm.* is short for mean_auc_normalized (normalized to [0, 1]).
+
+```{r, echo = FALSE}
+preprocess_results(results) %>%
+  filter(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann")) %>%
+  print.data.frame()
+```
+
+###  Overall means for different search.types
+
+```{r, echo = FALSE}
+preprocess_results(results) %>%
+  filter(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann")) %>%
+  group_by(search.type) %>%
+  summarize(mean_rank_auc = mean(mean_rank_auc), mean_auc = mean(mean_auc),
+    mean_auc_norm. =  mean(mn_auc_norm.), mean_med_auc = mean(median_auc))
+```
+
+### Overall means for different n
+
+```{r, echo = FALSE}
+preprocess_results(results) %>%
+  filter(search.type %in% c("design", "defaults_mean", "defaults_cycle", "hodges-lehmann")) %>%
+  group_by(n) %>%
+    summarize(mean_rank_auc = mean(mean_rank_auc), mean_auc = mean(mean_auc),
+      mean_auc_norm. =  mean(mn_auc_norm.), mean_med_auc = mean(median_auc))
+```
+
+
+## TSNE Plot
+
+Plot breaking down the parameter space to two dimensions using TSNE. 
+The different iters refer to different Leave-One-Out Splits of the dataset.
+
+```{r, echo = FALSE}
+plots$tsneplot
+```

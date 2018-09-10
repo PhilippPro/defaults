@@ -46,15 +46,18 @@ getLearnerParSets = function(){
   lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.xgboost", predict.type = "prob"), 
     param.set = makeParamSet(
       makeIntegerParam("nrounds", lower = 1, upper = 5000), 
-      makeNumericParam("eta", lower = -10, upper = 0, trafo = function(x) 2^x),
-      makeNumericParam("subsample",lower = 0.1, upper = 1),
       makeDiscreteParam("booster", values = c("gbtree", "gblinear")),
+      makeNumericParam("eta", lower = -10, upper = 0, trafo = function(x) 2^x),
+      makeNumericParam("subsample",lower = 0.1, upper = 1, requires = quote(booster == "gbtree")),
       makeIntegerParam("max_depth", lower = 1, upper = 15, requires = quote(booster == "gbtree")),
-      makeNumericParam("min_child_weight", lower = 0, upper = 7, requires = quote(booster == "gbtree"), trafo = function(x) 2^x),
+      makeNumericParam("min_child_weight", lower = 0, upper = 7, requires = quote(booster == "gbtree"),
+        trafo = function(x) 2^x),
       makeNumericParam("colsample_bytree", lower = 0, upper = 1, requires = quote(booster == "gbtree")),
       makeNumericParam("colsample_bylevel", lower = 0, upper = 1, requires = quote(booster == "gbtree")),
-      makeNumericParam("lambda", lower = -10, upper = 10, trafo = function(x) 2^x),
-      makeNumericParam("alpha", lower = -10, upper = 10, trafo = function(x) 2^x)),
+      makeNumericParam("lambda", lower = -10, upper = 10, trafo = function(x) 2^x,
+        requires = quote(booster == "gblinear")),
+      makeNumericParam("alpha", lower = -10, upper = 10, trafo = function(x) 2^x,
+        requires = quote(booster == "gblinear"))),
     lrn.ps.sets = lrn.par.set)
   
   return(lrn.par.set)
@@ -140,11 +143,67 @@ convertParamType = function(x, param_type) {
   return(x)
 }
 
+stringBuilder = function(folder, what, learner.name, cfg = NULL) {
+  files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.*_classif")]
+  out = stri_paste(folder, "/", what, gsub("regr.", "", files[grep(stri_sub(learner.name, from = 5), x = files)]))
+  if (!is.null(cfg))
+    out = paste0(stri_sub(out, to = -6), "_", cfg, ".RDS")
+  return(out)
+}
 
+load_surrogates = function(learner.name) {
+  files = list.files("surrogates")[grep(x = list.files("surrogates"), "regr.cubist_classif")]
+  catf("Loading surrogate for learner: %s", learner.name)
+  # Read surrogates from Hard Drive
+  surrogates = readRDS(stri_paste("surrogates/", files[grep(stri_sub(learner.name, from = 5), x = files)]))
+  return(surrogates)
+}
 
+# -------------------------------------------------------------------------------------------------
+# Creates a seed from a task and a learner object and the current random state
+# Not sure if this will be used.
+getHashSeed = function(task, learner, init.seed = 111) {
+  
+  # Hash the task and the learner object
+  hash = digest::digest(c(task, learner, init.seed), algo = "murmur32")
+  seed.state = paste0(sum(abs(.Random.seed)), collapse = "")
+  x = paste0(hash, seed.state)
+  
+  # And transform this hash to a seed
+  tmp = setNames(c(0:9,0:25), c(0:9, letters))
+  xsplit = tmp[strsplit(gsub("[^0-9a-z]", "", as.character(x)), '')[[1]]]
+  seed = sum(rev(7^(seq(along=xsplit) - 1)) * xsplit)
+  as.integer(seed %% (2^31-1))
+}
 
+makeProgressBarOpts = function() {
+  pb <- txtProgressBar(min=1, max=8000, style=3)
+  progress <- function(n) setTxtProgressBar(pb, n)
+  list(progress=progress)
+}
 
-
+# n = 4 random search can be obtained from random search for other n's
+refilln4 = function(lst) {
+  lst$oob.perf = lst$oob.perf %>% filter(n.defaults != 4) %>% filter(!(n.defaults == 8 & search.type == "X2"))
+  # Substitute random search with 8, 16 and 32 iters with known results
+  # RS with 8 iters:
+  x4n2 = lst$oob.perf %>% group_by(task.id) %>% filter(n.defaults == 2 &search.type == "X4")
+  x4n2$search.type = "X2"
+  # RS with 16 iters:
+  x8n2 = lst$oob.perf %>% group_by(task.id) %>% filter(n.defaults == 2 &search.type == "X8")
+  x8n2$search.type = "X4"
+  # RS with 32 iters:
+  x2n8 = lst$oob.perf %>% group_by(task.id) %>% filter(n.defaults == 8 &search.type == "X4")  
+  x2n8$search.type = "X8"
+  # n = 4 case
+  df = bind_rows(x4n2, x8n2, x2n8)
+  df$n.defaults = 4
+  # n = 8, X2 case:
+  x8n2$search.type = "X2"
+  x8n2$n.defaults = 8
+  lst$oob.perf = bind_rows(lst$oob.perf, df, x8n2)
+  return(lst)
+}
 
 # # Create Train/Test Splits: 
 # set.seed(199)

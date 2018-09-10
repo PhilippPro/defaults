@@ -1,0 +1,12 @@
+name: inverse_ecdf
+title: inverse_ecdf
+username:
+account: pfistfl
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 404890
+bundleId: 1548587
+url: https://pfistfl.shinyapps.io/inverse_ecdf/
+when: 1534945266.25908
+asMultiple: FALSE
+asStatic: FALSE

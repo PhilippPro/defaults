@@ -9,3 +9,7 @@
 *.Rbuildignore
 *.arff
 packrat*
+*_gc.json
+results_sklearn/*
+packrat/lib*/
+packrat/src/
