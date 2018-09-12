@@ -37,7 +37,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   # Forward selection ----------------------------------------------------------------------------------
   files = list.files("surrogates")[grep(x = list.files("surrogates"), pattern = "_regr.*_classif")]
   # for(i in c(2)) { # seq_along(learner.names)
-  i = 2
+  i = 1
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
 
@@ -205,8 +205,15 @@ foreach(i = c(1, 2, 4, 5, 6)) %dopar% {
   }
 }
 
+library(stringi)
 defs.files = list.files("full_defaults", full.names = TRUE)
-sapply(defs.files,  function(x) {farff::writeARFF(readRDS(x)$defaults, paste0(stringi::stri_sub(x, to = -5), "arff"), overwrite = TRUE)})
+defs.files = defs.files[stri_detect_fixed(defs.files, "auc_zscale_.RDS")]
+sapply(defs.files,  function(x) {
+  defaults = readRDS(x)$defaults
+  farff::writeARFF(defaults,
+  paste0(stringi::stri_sub(x, to = -6), ".arff"),
+  overwrite = TRUE)
+  })
 
 
 #--------------------------------------------------------------------------------------------------

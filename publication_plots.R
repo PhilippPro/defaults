@@ -30,7 +30,7 @@ df %>%
 
 f = list.files("defaultLOOCV/save", full.names = TRUE)
 fs = f[stri_detect_regex(f, "design_16.*glmnet")]
-
+lapply(fs, readRDS)
 
 # - GLMNET -------------------------------------------------------------
 glmnet = df %>%

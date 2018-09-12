@@ -60,6 +60,7 @@ makeObjFunction = function(surrogates_train, probs) {
 
   # Predict newdata, compute prediction
   function (x, defaults.perf = NULL) {
+
       # Compute predictions for each surrogate model
       prds = sapply(surrogates_train, function(surr) {
         predict(surr, newdata = x)$data$response
