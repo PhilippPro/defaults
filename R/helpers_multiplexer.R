@@ -1,16 +1,17 @@
 if (FALSE) {
 lrn.mm.ps = getModelMultiplexer()$ps
 all.surrogates = readAllSurrogates()
-fs.config = data.frame(iters = 10^3, depth = 1, reps = 1)
+fs.config = data.frame(iters = 100, depth = 1, reps = 1)
 
 # Defaults
 defs.file = paste0("defaultLOOCV/", "mean_defaults_", "multiplexer.RDS")
 
+registerDoMC(19)
 # Compute defaults if not yet available
 if (!file.exists(defs.file)) {
-  set.seed(199 + i)
+  set.seed(199)
   # Iterate over ResampleInstance and its indices
-  defs = foreach(it = seq_len(rin$desc$iters)) %dorng% {
+  defs = foreach(it = seq_len(38)) %dorng% {
     # Search for defaults
     defs = searchMMDefaults(
       all.surrogates, # training surrogates (L-1-Out-CV)
