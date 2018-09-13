@@ -37,7 +37,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   # Forward selection ----------------------------------------------------------------------------------
   files = list.files("surrogates")[grep(x = list.files("surrogates"), pattern = "_regr.*_classif")]
   # for(i in c(2)) { # seq_along(learner.names)
-  i = 1
+  i = 6
   catf("Learner: %s", learner.names[i])
   set.seed(199 + i)
 
@@ -73,6 +73,7 @@ surrogate.mlr.lrn = makeLearner("regr.cubist", committees = 20, extrapolation = 
   defs = readRDS(defs.file)
 
   n.defs = c(1, 2, 4, 8, 16, 32)
+  n.defs = c(16, 32)
   def.res = foreach(it = seq_len(rin$desc$iters)) %:%
     foreach(n = n.defs) %dopar% {
       evalDefaultsOpenML(

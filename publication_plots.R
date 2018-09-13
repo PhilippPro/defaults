@@ -2,6 +2,7 @@ packrat::off()
 library(devtools)
 load_all()
 
+# update_all_results()
 df = readRDS("defaultLOOCV/full_results.Rds")$oob.perf %>%
 	mutate(n = as.factor(n)) %>%
 	mutate(search.type = recode(search.type, "design" = "defaults")) %>%
@@ -23,14 +24,6 @@ df %>%
  filter(nn < 36) %>%
  print(n = 44)
 
-df %>%
- filter(learner.short == "ElasticNet") %>%
- filter(search.type == "defaults") %>%
- filter(n == 16)
-
-f = list.files("defaultLOOCV/save", full.names = TRUE)
-fs = f[stri_detect_regex(f, "design_16.*glmnet")]
-lapply(fs, readRDS)
 
 # - GLMNET -------------------------------------------------------------
 glmnet = df %>%
