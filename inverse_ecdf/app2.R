@@ -20,6 +20,7 @@ ui = dashboardPagePlus(
     enable_rightsidebar = TRUE,
     rightSidebarIcon = "bars",
     left_menu = tagList(
+      
       dropdownBlock(
         id = "colorblock",
         title = "Color",
@@ -27,22 +28,31 @@ ui = dashboardPagePlus(
         prettyCheckboxGroup(
           inputId = "color",
           label = "Grouping / Facet",
-          choices = c("search.type", "n", "learner.id", "task.id", "search.typeXn", "task.idXn"),
-          selected = "search.typeXn"
+          choices = c("search.type", "n", "learner.id", "task.id", "search.type and n", "task.id and n"),
+          selected = "search.type and n"
         )
       ),
+      
       dropdownBlock(
         id = "learnerblock",
         title = "Algorithm",
         icon = "sliders",
         prettyCheckboxGroup(
-          inputId = "learner",
-          label = "Grouping / Facet",
+          inputId = "learner.mlr",
+          label = "mlr learner",
           thick = TRUE,
-          choices = c("glmnet", "rpart", "xgboost", "adaboost", "random forest", "svm"),
+          choices = c("glmnet", "rpart", "xgboost"),
           selected = "rpart"
+        ),
+        prettyCheckboxGroup(
+          inputId = "learner.sklearn",
+          label = "sklearn learner",
+          thick = TRUE,
+          choices = c("adaboost", "random forest", "svm"),
+          selected = NULL
         )
       ),
+      
       dropdownBlock(
         id = "subsetblock",
         title = "Subsetting",
@@ -50,7 +60,7 @@ ui = dashboardPagePlus(
         prettyCheckboxGroup(
           inputId = "search.type",
           label = "result.type",
-          choices = c("design", "mbo", "package-default", "random"),
+          choices = c("defaults", "mbo", "package-default", "random"),
           selected = c("design", "random")
         ),
         prettyCheckboxGroup(
@@ -94,7 +104,8 @@ ui = dashboardPagePlus(
     tabItems(
       tabItem(tabName = "viz", plotOutput("invECDF")),
       tabItem(tabName = "data", 
-        h4(textOutput("restabtitle"))
+        h4(textOutput("restabtitle")),
+        dataTableOutput("restable")
         ),
       tabItem(tabName = "defs",
         h4(textOutput("deftabtitle")),
@@ -108,6 +119,7 @@ ui = dashboardPagePlus(
 
 # --------------------------------------------------------------------------------------------------
 server = function(input, output) {
+  
   # Plot
   output$invECDF = renderPlot({
     ggplot(iris) + geom_point(aes(x = Sepal.Width, y = Sepal.Length))
@@ -116,10 +128,13 @@ server = function(input, output) {
   
   # Results as table
   output$restabtitle = renderText("Results Table:")
+  output$restable = renderDataTable({
+    preproc_data(input) %>% aggregate_data(., input) %>% data.table()
+  }, options = list(dom = 't'))
   
   
   # Defaults
-  output$deftable <- renderDataTable({
+  output$deftable = renderDataTable({
     print_defaults(input)
   }, options = list(dom = 't'))
   output$deftabtitle = renderText("Defaults Table:")
