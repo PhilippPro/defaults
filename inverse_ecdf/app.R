@@ -6,10 +6,17 @@ library(dplyr)
 library(ggplot2)
 library(data.table)
 library(farff)
+library(shinydashboard)
+library(shinydashboardPlus)
 
-# Define UI for application that draws a histogram
-ui = fluidPage(
-   
+
+ui = dashboardPagePlus(
+  header = dashboardHeaderPlus(
+  ),
+  sidebar = dashboardSidebar(),
+  body = dashboardBody(),
+  
+  
    # Application title
    titlePanel("Inverse ECDF"),
    
@@ -171,22 +178,6 @@ server <- function(input, output) {
    output$deftab = renderText("Defaults Table:")
    output$restab = renderText("Results Table:")
    output$defsinfo = renderText("'-11' indicates no value")
-   # output$increaseEvals = renderPlot({
-   #   library(ggplot2)
-   #   
-   #   learner = get_long_learner_name(input$learner)
-   #   
-   #   # Get Data
-   #   data = readRDS("full_results.Rds")$oob.perf %>% preproc_data(input, learner)
-   #   data2 = create_table(data, input, learner)
-   #   
-   #   ggplot() +
-   #     geom_point(data = data, aes_string(x = "n", y = "auc.test.mean", color = input$color), aes = 0.4) +
-   #     geom_line(data = data, lty = 2, aes_string(group = input$color), aes = 0.4) +
-   #     geom_point(data = data2, aes_string(x = "n", y = "mean_auc"), color = "black", aes = 0.8) +
-   #     geom_line(data = data2, lty = 2, aes_string(x = "n", y = "mean_auc"),color = "black", aes = 0.8) +
-   #     xlab("Number of evaluations")
-   # })
 }
 
 # Run the application 
