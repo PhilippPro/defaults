@@ -1,15 +1,3 @@
-get_long_learner_name = function(learner) {
-  sapply(learner, function(x) {
-    learner = switch(x, 
-      "glmnet" = "classif.glmnet.tuned",
-      "rpart" = "classif.rpart.tuned",
-      "svm" = "classif.svm.tuned",
-      "xgboost" = "classif.xgboost.dummied.tuned"
-    )
-  })
-}
-
-# --------------------------------------------------------------------------------------------------
 learner_to_default_set_name = function(learner) {
   sapply(learner, function(x) {
   switch(x,
@@ -17,50 +5,51 @@ learner_to_default_set_name = function(learner) {
     "rpart" = "mlr_rpart",
     "xgboost" = "mlr_xgboost",
     "adaboost" = "sklearn_adaboost",
-    "random forest" = "sklearn_random_forest",
-    "svm" = "sklearn_svm")
+    "random_forest" = "sklearn_random_forest",
+    "libsvm_svc" = "sklearn_libsvm_svc")
   })
 }
 
-print_defaults = function(input) {
-  set_name = learner_to_default_set_name(input$learner)
+print_defaults = function(learner) {
+  set_name = learner_to_default_set_name(learner[1])
   df = readRDS(paste0("default_sets/median_defaults_", set_name, ".RDS"))$defaults
   df = data.frame(default_no = paste0(seq_len(nrow(df)), "."), df)
   df %>% data.table()
 }
 
-preproc_data = function(input) {
+preproc_data = function(input, learner) {
   readRDS("full_results.Rds") %>%
     filter(search.type %in% input$search.type) %>%
-    filter(n %in% input$ndef | !(search.type == "defaults")) %>%
-    filter(n %in% input$nrs | !(search.type %in% c("random"))) %>%
-    filter(learner.short %in% input$learner) %>%
+    filter(n %in% input$ndef | search.type != "defaults") %>%
+    filter(n %in% input$nrs | search.type != "random") %>%
+    filter(learner.short %in% learner) %>%
     mutate(n = as.factor(n)) %>%
     mutate(search.typeXn = paste(search.type, n, sep = "_")) %>%
     mutate(task.idXn = paste(task.id, n, sep = "_"))
 }
 
-aggregate_data = function(data, input) {
+aggregate_data = function(data, input, measure_str) {
   
+  # Define symbols for dplyr quoting
   variable = rlang::sym(input$color)
-  
-  # Either aggregate by me
-  measure.name = ifelse(input$learner %in% c("rpart", "glmnet", "xgboost"), "auc.test.mean", "acc.test.mean")
-  measure = rlang::sym(measure.name)
+  measure = rlang::sym(measure_str)
   
   # compute rank
   data = data %>%
     group_by(task.id) %>%
     mutate(
-      rnk = dense_rank(desc(!! measure)), 
-      auc.test.normalized = (!! measure - min(!! measure)) / (max(!! measure) - min(!! measure))
+      rnk = dense_rank(desc(!! measure)),
+      measure.normalized = ifelse(
+        max(!! measure) == min(!! measure), 1,
+        (!! measure - min(!! measure)) / (max(!! measure) - min(!! measure))
+      )
     )  %>%
     ungroup()
   
   # Group depending on facet variable
   if (input$color == "learner.id") {
     data = data %>%
-      group_by(learner.id, search.type, n) 
+      group_by(learner.short, search.type, n) 
   } else if (input$color == "task.id") {
     data = data %>%
       group_by(task.id)
@@ -77,20 +66,48 @@ aggregate_data = function(data, input) {
       group_by(search.type, n) 
   }
   
-  # Aggregate
-  data %>%
-    summarise(
-      mean_rank_auc = mean(rnk),
-      mean_auc = mean(auc.test.mean),
-      mn_auc_norm. = mean(auc.test.normalized),
-      median_auc = median(auc.test.mean),
-      cnt = n(),
-      cnt_na = sum(is.na(auc.test.mean))) %>%
-    group_by(!! variable) %>%
-    summarize(mean_rank_auc = mean(mean_rank_auc), mean_auc = mean(mean_auc),
-      mean_auc_norm. =  mean(mn_auc_norm.), mean_med_auc = mean(median_auc))
   
+  # Aggregate
+  if (input$framework == "mlr") {
+    data = data %>%
+      summarise(
+        mean_rank_auc = mean(rnk),
+        mean_auc = mean(!! measure),
+        mn_auc_norm = mean(measure.normalized),
+        median_auc = median(!! measure),
+        cnt = n(),
+        cnt_na = sum(is.na(!! measure))) %>%
+      group_by(!! variable) %>%
+      summarize(mean_rank_auc = mean(mean_rank_auc), mean_auc = mean(mean_auc),
+        mean_auc_norm. =  mean(mn_auc_norm))
+  } else {
+    data = data %>%
+      summarise(
+        mean_rank_acc = mean(rnk),
+        mean_acc = mean(!! measure),
+        mn_acc_norm = mean(measure.normalized),
+        median_acc = median(!! measure),
+        cnt = n(),
+        cnt_na = sum(is.na(!! measure))) %>%
+      group_by(!! variable) %>%
+      summarize(mean_rank_acc = mean(mean_rank_acc), mean_auc = mean(mean_acc),
+        mean_acc_norm. =  mean(mn_acc_norm))
+  }
+  return(data)
 }
+
+
+# get_long_learner_name = function(learner) {
+#   sapply(learner, function(x) {
+#     learner = switch(x, 
+#       "glmnet" = "classif.glmnet.tuned",
+#       "rpart" = "classif.rpart.tuned",
+#       "svm" = "classif.svm.tuned",
+#       "xgboost" = "classif.xgboost.dummied.tuned"
+#     )
+#   })
+# }
+# --------------------------------------------------------------------------------------------------
 ## Preprocess results and save as RDS
 # lst = readRDS("defaultLOOCV/full_results.Rds")$oob.perf
 # lst = lst %>%
