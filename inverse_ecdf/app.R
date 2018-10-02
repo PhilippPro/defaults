@@ -8,6 +8,7 @@ library(data.table)
 library(farff)
 library(shinydashboard)
 library(shinydashboardPlus)
+library(shinyWidgets)
 library(shinyjs)
 
 source("helpers.R")
@@ -26,7 +27,7 @@ ui = dashboardPagePlus(
         id = "colorblock",
         title = "Color",
         icon = "sliders",
-        prettyCheckboxGroup(
+        prettyRadioButtons(
           inputId = "color",
           label = "Grouping / Facet",
           choices = c("search.type", "n", "learner.id", "task.id", "search.type and n", "task.id and n"),
@@ -171,7 +172,8 @@ server = function(input, output) {
   # Results as table
   output$restabtitle = renderText("Results Table:")
   output$restable = renderDataTable({
-    preproc_data(input, learner()) %>% aggregate_data(., input, measure_str()) %>% data.table()
+    if(!is.null(input$color))
+      preproc_data(input, learner()) %>% aggregate_data(., input, measure_str()) %>% data.table()
   }, options = list(dom = 't'))
   output$restabinfo = renderText("'mean_*_norm.' indicates the mean performance achieved
     as percentage of the maximum for each task.")

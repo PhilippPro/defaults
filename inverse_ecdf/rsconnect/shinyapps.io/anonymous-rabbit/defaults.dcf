@@ -5,8 +5,8 @@ account: anonymous-rabbit
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 422520
-bundleId: 1571624
+bundleId: 1617604
 url: https://anonymous-rabbit.shinyapps.io/defaults/
-when: 1536187726.52604
+when: 1538467499.3497
 asMultiple: FALSE
 asStatic: FALSE

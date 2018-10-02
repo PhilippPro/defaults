@@ -39,12 +39,10 @@ aggregate_data = function(data, input, measure_str) {
     group_by(task.id) %>%
     mutate(
       rnk = dense_rank(desc(!! measure)),
-      measure.normalized = ifelse(
-        max(!! measure) == min(!! measure), 1,
-        (!! measure - min(!! measure)) / (max(!! measure) - min(!! measure))
-      )
-    )  %>%
-    ungroup()
+      measure.normalized = (!! measure - min(!! measure)) / (max(!! measure) - min(!! measure))
+      ) %>%
+    ungroup() %>%
+    mutate(measure.normalized = ifelse(is.nan(measure.normalized), 1, measure.normalized))
   
   # Group depending on facet variable
   if (input$color == "learner.id") {
