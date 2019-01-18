@@ -8,12 +8,11 @@ library(foreach)      # Parallelization
 load_all()
 
 # Get randomBot Data from the figshare repository-------------------------
-# load(url("https://ndownloader.figshare.com/files/10462297"))
+#
 
 
 # Train/Save the surrogates ------------------------------------------------------
-lrn.par.sets = getLearnerParSets()
-learner.names = stri_sub(stri_paste("mlr.", names(lrn.par.sets)), 1, -5)
+
 
 # Use cubist as a learner
 # 20 Comittees in order to get a lower mse (25% better then 1 comittee)
