@@ -1,9 +1,0 @@
-rnk kernel c degree gamma
-1 RBF 8 - 0.1
-2 RBF 16  - 5
-3 RBF 8 - 0.01
-4 RBF 16  - 0.5
-5 Linear  4 - -
-6 RBF 64  - 10
-7 Polynomial  8 6 -
-8 RBF 16  - 100
