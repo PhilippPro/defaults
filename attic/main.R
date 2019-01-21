@@ -2,6 +2,7 @@ library(devtools)         # load_all()
 library(stringi)          # string manipulation
 library(focussearch)      # Search the surrogates
 library(foreach)
+library(R6)
 load_all()                # /R
 load_all("../surrogates") # Surrogates
 
@@ -27,7 +28,7 @@ res1 = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
 
 # xgboost
 sc = make_surrogates_omlbot(baselearners = c("xgboost"))
-res = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
+res_xgb = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
   # Search 10 Defaults, hold out task x
   ds = DefaultSearch$new(sc, 32L, oml_task_id)
   ds$search_defaults()
@@ -37,7 +38,7 @@ res = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
 
 # svm
 sc = make_surrogates_omlbot(baselearners = c("svm"))
-res = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
+res_svm = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
   # Search 10 Defaults, hold out task x
   ds = DefaultSearch$new(sc, 32L, oml_task_id)
   ds$search_defaults()

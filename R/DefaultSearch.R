@@ -11,7 +11,7 @@ DefaultSearch = R6Class("DefaultSearch",
     # Surrogates
     sc = NULL,
     fail_handle = NULL,
-    ctrl = makeFocusSearchControl(maxit = 1, restarts = 1, points = 5*10),
+    ctrl = makeFocusSearchControl(maxit = 1, restarts = 1, points = 10^5),
     show.info = FALSE,
     holdout_task_id = NULL,
 
@@ -40,19 +40,18 @@ DefaultSearch = R6Class("DefaultSearch",
       if (overwrite) self$clear()
       if (length(self$defaults.params) == 0L)
         self$acquire_defaults()
-
       # Compute n.defaults  default parameters iteratively
       # Defaults from earlier iterations influence later ones.
       for (j in seq_len(self$n.defaults)) {
-        if (length(self$defaults.params) >= self$n.defaults)
+        if (length(self$defaults.params) >= self$n.defaults) {
           messagef("Already found %s defaults!", self$n.defaults)
           break
+        }
 
         for (restart.iter in seq_len(self$ctrl$restarts)) {
           if (self$show.info)
             catf("Multistart %i of %i \n", restart.iter, control$restarts)
           for (local.iter in seq_len(self$ctrl$maxit)) {
-            browser()
             z = self$do_random_search()
             if (z$y > self$best.y) {
               if (self$show.info)
