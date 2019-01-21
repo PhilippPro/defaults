@@ -1,4 +1,11 @@
-# Obtains data from figshare, saves a data.frame
+#' Preprocess figshare data
+#'
+#' Obtains data from figshare, saves a (long) data.frame with the following columns:
+#' - performance: Performance value
+#' - measure:     Measure (auc, acc, brier)
+#' - learner_id:  Learner (see get_baselearners())
+#' - ...          The whole parameter set across all learners.
+#' @param bot_data Path to save the result to.
 figshare_to_data = function(bot_data = "data/oml_bot_data.RDS") {
   load(url("https://ndownloader.figshare.com/files/10462297"))
   lps = getLearnerParSets()
@@ -43,40 +50,50 @@ figshare_to_data = function(bot_data = "data/oml_bot_data.RDS") {
   saveRDS(file = bot_data, learner_feats_list %>% group_by(learner_id) %>% select(-fullName))
 }
 
+#' Return a list of specified surrogates
+#' @param oml_task_ids  A vector of oml task ids for which we want to create surrogates. Defaults to all in get_oml_task_ids().
+#' @param baselearners  A vector of baselearners for which we want to create surrogates. Defaults to all in get_baselearners().
+#' @param measures      A vector of measures for which we want to create surrogates. Defaults to all in get_measures().
+#' @param surrogate_lrn A mlr [Learner]. Defaults to "regr.fixcubist".
+make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogate_lrn) {
 
-make_surrogates_omlbot = function() {
-  # Obtain fixed cubist from the internet
-  source("https://raw.githubusercontent.com/pfistfl/mlr-extralearner/master/R/RLearner_regr_fixcubist.R")
-  SURROGATE_LRN = mlr::makeLearner("regr.fixcubist", committees = 20, extrapolation = 20)
+  if(missing(surrogate_lrn))
+    # Obtain fixed cubist from the internet
+    source("https://raw.githubusercontent.com/pfistfl/mlr-extralearner/master/R/RLearner_regr_fixcubist.R")
+    surrogate_lrn = mlr::makeLearner("regr.fixcubist", committees = 20, extrapolation = 20)
 
-  OML_TASK_IDS = c(3L, 31L, 37L, 43L, 49L, 219L, 3485L, 3492L, 3493L, 3494L, 3889L,
-    3891L, 3896L, 3899L, 3902L, 3903L, 3913L, 3917L, 3918L, 3954L,
-    34536L, 14971L, 14965L, 10093L, 10101L, 9980L, 9983L, 9970L,
-    9971L, 9976L, 9977L, 9978L, 9952L, 9957L, 9967L, 9946L, 9914L,
-    14966L, 34539L, 34537L)
-  BASE_LEARNERS = c("glmnet", "rpart", "svm", "ranger", "xgboost")
-  MEASURES = c("auc", "acc", "brier")
+  if (missing(oml_task_ids))
+    oml_task_ids = get_oml_task_ids()
+
+  if (missing(baselearners))
+    baselearners = get_baselearners()
+  if (missing(measures))
+    measures = get_measures()
 
   surrs = foreach(measure_name = "auc", .combine = "c") %:%
-    foreach(oml_task_id = OML_TASK_IDS, .combine = "c") %:%
-      foreach(baselearner_name = BASE_LEARNERS, .combine = "c") %do% {
+    foreach(oml_task_id = oml_task_ids, .combine = "c") %:%
+      foreach(baselearner_name = baselearners, .combine = "c") %do% {
         s = SurrogateFromRDS$new(
         oml_task_id = oml_task_id,
         baselearner_name = baselearner_name,
         data_source = "data/oml_bot_data.RDS",
         measure_name = measure_name,
-        surrogate_learner = SURROGATE_LRN)
+        surrogate_learner = surrogate_lrn)
       }
-  return(surrs)
+  sc = SurrogateCollection$new(surrs)
+  return(sc)
 }
 
-train_surrogates_omlbot = function() {
+#' Train all surrogates for a given surrogate collection.
+#' @param sc [SurrogateCollection] if missing, calls make_surrogate_omlbot().
+#' @param overwrite should existing surrogates be overwritten?
+train_surrogates_omlbot = function(sc, overwrite = FALSE) {
+  if (overwrite) unlink("surrogates", recursive = TRUE, force = TRUE)
   require(doParallel)
   registerDoParallel(12L)
-  surrs = make_surrogates()
-  not_trained = seq_along(surrs)[sapply(surrs, function(x) !x$is_trained)]
-  doParallel::registerDoParallel(12)
-  foreach(s = surrs[not_trained]) %dopar% {
+  sc = make_surrogates_omlbot()
+  not_trained = seq_along(sc$surrogates)[sapply(sc$surrogates, function(x) !x$is_trained)]
+  foreach(s = sc$surrogates[not_trained]) %dopar% {
     gc()
     s$train()
     NULL

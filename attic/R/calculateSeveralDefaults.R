@@ -3,10 +3,10 @@
 # @param par.set Parameter set
 # @param n.defauls How many defaults
 # @param probs Quantile to optimize
-searchDefaults = function(surrogates_train, par.set, n.defaults = 10, probs = 0.5, fs.config = NULL) {
+searchDefaults = function(sc, n.defaults = 10L) {
 
   # Create the objective function we want to optimize
-  pfun = makeObjFunction(surrogates_train, probs)
+  pfun = makeObjFunction()
 
   # Instantiate default parameters and respective performances
   defaults.perf = NULL
