@@ -2,7 +2,7 @@
 #'
 #' Greedily searches for defaults.
 #' @param sc = SurrogateCollection
-#' @param n.defaults Number of defaults
+#' @param n_defaults Number of defaults
 #' @param holdout_task_id Which task should be held out?
 #' @param fail_handle Path for fail()
 DefaultSearch = R6Class("DefaultSearch",
@@ -15,7 +15,7 @@ DefaultSearch = R6Class("DefaultSearch",
     show.info = FALSE,
     holdout_task_id = NULL,
 
-    n.defaults = NULL,
+    n_defaults = NULL,
     defaults.perf = NULL,
     defaults.params = list(),
     prd_aggregator = NULL,
@@ -23,9 +23,9 @@ DefaultSearch = R6Class("DefaultSearch",
     y = NULL,
     best.y = - Inf,
 
-    initialize = function(sc, n.defaults = 10L, holdout_task_id, fail_handle) {
+    initialize = function(sc, n_defaults = 10L, holdout_task_id, fail_handle) {
       self$sc = assert_class(sc, "SurrogateCollection")$clone()
-      self$n.defaults = assert_int(n.defaults)
+      self$n_defaults = assert_int(n_defaults)
       self$holdout_task_id = assert_int(holdout_task_id)
       self$sc$set_holdout_task(self$holdout_task_id)
       self$fail_handle = if(missing(fail_handle)) fail::fail(self$fail_path()) else assert_path_for_output(fail_handle)
@@ -40,11 +40,11 @@ DefaultSearch = R6Class("DefaultSearch",
       if (overwrite) self$clear()
       if (length(self$defaults.params) == 0L)
         self$acquire_defaults()
-      # Compute n.defaults  default parameters iteratively
+      # Compute n_defaults  default parameters iteratively
       # Defaults from earlier iterations influence later ones.
-      for (j in seq_len(self$n.defaults)) {
-        if (length(self$defaults.params) >= self$n.defaults) {
-          messagef("Already found %s defaults!", self$n.defaults)
+      for (j in seq_len(self$n_defaults)) {
+        if (length(self$defaults.params) >= self$n_defaults) {
+          messagef("Already found %s defaults!", self$n_defaults)
           break
         }
 
@@ -88,7 +88,7 @@ DefaultSearch = R6Class("DefaultSearch",
     },
 
     # Draw random configurations for a set of baselearners
-    generate_random_points = function(npoints = 1000L, baselearners = c("svm", "xgboost")) {
+    generate_random_points = function(npoints, baselearners) {
       bl_props = round(npoints / length(baselearners))
       nd = lapply(baselearners, function(x) {
         ps = get_param_set(x)
@@ -125,10 +125,21 @@ DefaultSearch = R6Class("DefaultSearch",
     },
 
     evaluate_defaults_holdout = function() {
+      browser()
       out = self$sc$evaluate_holdout_task(self$defaults.params)
       res = do.call("rbind", lapply(out, self$fix_prds_names))
+      self$fail_handle$put(keys = "holdout.perfs", res)
       return(res)
     },
+
+    get_holdout_performance = function(overwrite = FALSE) {
+      if ("holdout.perfs" %in% self$fail_handle$ls() && !overwrite) {
+        self$fail_handle$get("holdout.perfs")
+      } else {
+        self$evaluate_defaults_holdout()
+      }
+    },
+
     fix_prds_names = function(x) {
       colnames(x) = stri_sub(stri_extract_all_regex(colnames(x), ".*_"), to = -2)
       return(x)

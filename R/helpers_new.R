@@ -18,19 +18,3 @@ get_baselearners = function() {
 get_measures = function() {
   c("auc", "acc", "brier")
 }
-
-#' Substitute NA's with out of bounds data.
-deleteNA = function(task.data) {
-  for(i in 1:ncol(task.data)) {
-    if(is.numeric(task.data[, i]))
-      task.data[is.na(task.data[, i]), i] = -10 - 1
-    if(is.factor(task.data[, i])) {
-      task.data[, i] = addNA(task.data[, i])
-      task.data[, i] = droplevels(task.data[, i])
-    }
-    if(is.logical(task.data[, i]))
-      task.data[, i] = as.factor(task.data[, i])
-  }
-  task.data
-}
-

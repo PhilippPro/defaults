@@ -11,6 +11,7 @@ figshare_to_data = function(bot_data = "data/oml_bot_data.RDS") {
   lps = getLearnerParSets()
   tbl.metaFeatures = tbl.metaFeatures %>% filter(quality %in% c("NumberOfFeatures", "NumberOfInstances"))
 
+  browser()
   # Get a data.frame with all hpar <-> performance combinations
   learner_feats_list = tbl.hypPars %>%
     group_by(fullName) %>%
@@ -50,6 +51,7 @@ figshare_to_data = function(bot_data = "data/oml_bot_data.RDS") {
   saveRDS(file = bot_data, learner_feats_list %>% group_by(learner_id) %>% select(-fullName))
 }
 
+
 #' Return a list of specified surrogates
 #' @param oml_task_ids  A vector of oml task ids for which we want to create surrogates. Defaults to all in get_oml_task_ids().
 #' @param baselearners  A vector of baselearners for which we want to create surrogates. Defaults to all in get_baselearners().
@@ -84,6 +86,7 @@ make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogat
   return(sc)
 }
 
+
 #' Train all surrogates for a given surrogate collection.
 #' @param sc [SurrogateCollection] if missing, calls make_surrogate_omlbot().
 #' @param overwrite should existing surrogates be overwritten?
@@ -99,5 +102,21 @@ train_surrogates_omlbot = function(sc, overwrite = FALSE) {
     NULL
   }
   invisible(NULL)
+}
+
+
+#' Substitute NA's with out of bounds data.
+deleteNA = function(task.data) {
+  for(i in 1:ncol(task.data)) {
+    if(is.numeric(task.data[, i]))
+      task.data[is.na(task.data[, i]), i] = -10 - 1
+    if(is.factor(task.data[, i])) {
+      task.data[, i] = addNA(task.data[, i])
+      task.data[, i] = droplevels(task.data[, i])
+    }
+    if(is.logical(task.data[, i]))
+      task.data[, i] = as.factor(task.data[, i])
+  }
+  task.data
 }
 
