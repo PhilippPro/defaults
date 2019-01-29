@@ -22,13 +22,14 @@ DefaultSearch = R6Class("DefaultSearch",
     maximize = TRUE,
     y = NULL,
     best.y = - Inf,
-    aggfun = "mean",
+    aggfun = NULL,
 
-    initialize = function(sc, n_defaults = 10L, holdout_task_id, fail_handle) {
+    initialize = function(sc, n_defaults = 10L, holdout_task_id, aggfun = "mean", fail_handle) {
       self$sc = assert_class(sc, "SurrogateCollection")$clone()
       self$n_defaults = assert_int(n_defaults)
       self$holdout_task_id = assert_int(holdout_task_id)
       self$sc$set_holdout_task(self$holdout_task_id)
+      self$aggfun = assert_choice(aggfun, choices = c("mean", "median"))
       self$fail_handle = if(missing(fail_handle)) fail::fail(self$fail_path()) else assert_path_for_output(fail_handle)
     },
 
