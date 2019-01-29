@@ -22,6 +22,7 @@ DefaultSearch = R6Class("DefaultSearch",
     maximize = TRUE,
     y = NULL,
     best.y = - Inf,
+    aggfun = "mean"
 
     initialize = function(sc, n_defaults = 10L, holdout_task_id, fail_handle) {
       self$sc = assert_class(sc, "SurrogateCollection")$clone()
@@ -114,18 +115,18 @@ DefaultSearch = R6Class("DefaultSearch",
 
     # Objective function for aggregation
     objfun = function(prds) {
+      fun = switch(self$aggfun, "mean" = mean, "median" = median)
       lapply(prds, function(x) {
         # Invert perfs if measure is not maximized
         if (!self$maximize) x = -x
         # Parallel minimum with current best
         pmax = apply(x, 1, function(x) pmax(x, self$best.perfs))
-        # Compute median
-        pmed = apply(pmax, 2, median)
+        # Compute mean
+        pmed = apply(pmax, 2, fun)
       })
     },
 
     evaluate_defaults_holdout = function() {
-      browser()
       out = self$sc$evaluate_holdout_task(self$defaults.params)
       res = do.call("rbind", lapply(out, self$fix_prds_names))
       self$fail_handle$put(keys = "holdout.perfs", res)
@@ -152,9 +153,10 @@ DefaultSearch = R6Class("DefaultSearch",
       scale = paste0(unique(self$sc$scaling), collapse = "_")
       paste("defaults", lrns,
         paste0(slrn, "_surrogate"),
-        paste0(meas,  "_", scale),
+        paste(meas, scale, self$aggfun, sep = "_"),
         self$sc$holdout_task_id, sep = "/")
     },
+
     acquire_defaults = function() {
       if ("params" %in% self$fail_handle$ls()) {
         self$defaults.params = self$fail_handle$get("params")
