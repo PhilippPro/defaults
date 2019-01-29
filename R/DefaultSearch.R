@@ -22,7 +22,7 @@ DefaultSearch = R6Class("DefaultSearch",
     maximize = TRUE,
     y = NULL,
     best.y = - Inf,
-    aggfun = "mean"
+    aggfun = "mean",
 
     initialize = function(sc, n_defaults = 10L, holdout_task_id, fail_handle) {
       self$sc = assert_class(sc, "SurrogateCollection")$clone()
