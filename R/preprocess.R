@@ -120,3 +120,11 @@ deleteNA = function(task.data) {
   task.data
 }
 
+# Convert wide to long
+to_long = function(res, lrn) {
+  res = data.frame(res)
+  res$id = seq_len(32)
+  long = gather(res, "task", "auc", -id)
+  long$learner = lrn
+  long
+}
