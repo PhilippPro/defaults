@@ -5,7 +5,7 @@ load_all()
 
 
 # Preprocessing Steps (only run once)
-# Step 1: Obtain OML Bot Data -> figshare_to_data()
+# Step 1: Obtain OML Bot Data -> Run figshare_to_data() to download the data once.
 # Step 2: Train Surrogates    -> train_surrogates_omlbot()
 # Step 3: Search for the defaults -> calculate_defaults.R
 

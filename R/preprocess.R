@@ -7,7 +7,7 @@
 #' - ...          The whole parameter set across all learners.
 #' @param bot_data Path to save the result to.
 #' @export
-figshare_to_data = function(bot_data = "data/oml_bot_data.RDS") {
+figshare_to_data = function(bot_data = "data/input/oml_bot_data.RDS") {
   load(url("https://ndownloader.figshare.com/files/10462297"))
   lps = getLearnerParSets()
   tbl.metaFeatures = tbl.metaFeatures %>% filter(quality %in% c("NumberOfFeatures", "NumberOfInstances"))
@@ -75,12 +75,15 @@ make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogat
   surrs = foreach(measure_name = measures, .combine = "c") %:%
     foreach(oml_task_id = oml_task_ids, .combine = "c") %:%
       foreach(baselearner_name = baselearners, .combine = "c") %dopar% {
-        surrogates::SurrogateFromRDS$new(
+        s = surrogates::SurrogateFromRDS$new(
           oml_task_id = oml_task_id,
           baselearner_name = baselearner_name,
-          data_source = "data/oml_bot_data.RDS",
+          data_source = "data/input/oml_bot_data.RDS",
           measure_name = measure_name,
-          surrogate_learner = surrogate_lrn)
+          surrogate_learner = surrogate_lrn,
+          handle_prefix = "data/intermediate/")
+        s$train()
+        return(s)
       }
   sc = surrogates::SurrogateCollection$new(surrs)
   return(sc)
@@ -129,4 +132,10 @@ to_long = function(res, lrn) {
   long = tidyr::gather(res, "task", "auc", -id)
   long$learner = lrn
   long
+}
+
+#' Fix names of the predictions.
+fix_prds_names = function(x) {
+  colnames(x) = stringi::stri_sub(stringi::stri_extract_all_regex(colnames(x), ".*_"), to = -2)
+  return(x)
 }

@@ -1,40 +1,46 @@
 #' DefaultSearch [R6Class]
 #'
 #' Greedily searches for defaults.
-#' @param sc = SurrogateCollection
-#' @param n_defaults Number of defaults
-#' @param holdout_task_id Which task should be held out?
-#' @param fail_handle Path for fail()
+#' @param sc [`surrogates::SurrogateCollection`]
+#' @param n_defaults Number of defaults to search for.
+#' @param holdout_task_id Which task should be held out? Does not hold out any task if `NULL`.
+#' @param aggfun [`character(1)`] Aggregation function. Either "mean" or "median".
+#' @param fail_handle [`character(1)`] Path for fail(). Creates a fail_handle if NULL.
+#' @param prefix [`character(1)`] Prefix for the fail_path (Optional).
+#'   Allows to train different versions for a given combination.
+#' @export
 DefaultSearch = R6::R6Class("DefaultSearch",
 
   public = list(
     # Surrogates
     sc = NULL,
     fail_handle = NULL,
-    ctrl = focussearch::makeFocusSearchControl(maxit = 1, restarts = 1, points = 10^5),
-    show.info = FALSE,
+    prefix = NULL,
     holdout_task_id = NULL,
-
     n_defaults = NULL,
+    show.info = FALSE,
+    ctrl = focussearch::makeFocusSearchControl(maxit = 1, restarts = 1, points = 10^5),
+    ps = NULL,
+
     defaults.perf = NULL,
     defaults.params = list(),
     prd_aggregator = NULL,
     maximize = TRUE,
-    ps = NULL,
+
     y = NULL,
     best.y = - Inf,
     aggfun = NULL,
-    prefix = NULL,
 
-    initialize = function(sc, n_defaults = 10L, holdout_task_id, aggfun = "mean", fail_handle, prefix = NULL) {
+    initialize = function(sc, n_defaults = 10L, holdout_task_id, aggfun = "mean", fail_handle = NULL, prefix = NULL) {
       self$sc = assert_class(sc, "SurrogateCollection")$clone()
       self$n_defaults = assert_int(n_defaults)
-      self$prefix = assert_character(prefix, null.ok = TRUE)
+
       self$holdout_task_id = assert_int(holdout_task_id)
       self$sc$set_holdout_task(self$holdout_task_id)
+
       self$aggfun = assert_choice(aggfun, choices = c("mean", "median"))
-      self$fail_handle = if(missing(fail_handle)) fail::fail(self$fail_path()) else assert_path_for_output(fail_handle)
-      self$ps = setNames(lapply(unique(self$sc$baselearners), surrogates:::get_param_set), unique(self$sc$baselearners))
+      self$fail_handle = if(!is.null(fail_handle)) fail::fail(self$fail_path(prefix)) else assert_path_for_output(fail_handle)
+      self$ps = setNames(lapply(unique(self$sc$baselearners), get_param_set), unique(self$sc$baselearners))
     },
 
     # Search defaults as specified.
@@ -78,7 +84,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
     do_random_search = function() {
       pts = self$generate_random_points(self$ctrl$points, unique(self$sc$baselearners))
       prds = self$sc$predict(pts)
-      prds = lapply(prds, self$fix_prds_names)
+      prds = lapply(prds, fix_prds_names)
       # Compute the aggregation
       prds.agg = self$objfun(prds)
       assert_true(all(names(prds.agg) == names(prds)))
@@ -133,7 +139,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
 
     evaluate_defaults_holdout = function() {
       out = self$sc$evaluate_holdout_task(self$defaults.params)
-      res = do.call("rbind", lapply(out, self$fix_prds_names))
+      res = do.call("rbind", lapply(out, fix_prds_names))
       self$fail_handle$put(keys = "holdout.perfs", res)
       return(res)
     },
@@ -146,18 +152,14 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       }
     },
 
-    fix_prds_names = function(x) {
-      colnames(x) = stri_sub(stri_extract_all_regex(colnames(x), ".*_"), to = -2)
-      return(x)
-    },
-
-    fail_path = function() {
+    fail_path = function(prefix) {
+      assert_character(prefix, null.ok = TRUE)
       lrns = paste0(unique(self$sc$baselearners), collapse = "_")
       meas = paste0(unique(self$sc$measures), collapse = "_")
       slrn = paste0(unique(self$sc$surrogate_learner), collapse = "_")
       scale = paste0(unique(self$sc$scaling), collapse = "_")
       path = paste("defaults",
-        paste0(self$prefix, "_", lrns),
+        paste0(prefix, "_", lrns),
         paste0(slrn, "_surrogate"),
         paste(meas, scale, self$aggfun, sep = "_"),
         self$sc$holdout_task_id, sep = "/")

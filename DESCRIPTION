@@ -1,7 +1,7 @@
 Package: defaults
 Title: Calculate default settings
 Version: 0.0.0.1
-Authors@R: person("Florian", "Pfisterer", email = "philipp_probst@gmx.de", role = c("aut", "cre"))
+Authors@R: person("Florian", "Pfisterer", email = "pfistererf@googlemail.com", role = c("aut", "cre"))
 Description: Calculate defaults based on results of the OpenML bot.
 License: GPL-2
 Encoding: UTF-8
