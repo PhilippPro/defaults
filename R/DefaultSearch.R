@@ -5,13 +5,13 @@
 #' @param n_defaults Number of defaults
 #' @param holdout_task_id Which task should be held out?
 #' @param fail_handle Path for fail()
-DefaultSearch = R6Class("DefaultSearch",
+DefaultSearch = R6::R6Class("DefaultSearch",
 
   public = list(
     # Surrogates
     sc = NULL,
     fail_handle = NULL,
-    ctrl = makeFocusSearchControl(maxit = 1, restarts = 1, points = 10^5),
+    ctrl = focussearch::makeFocusSearchControl(maxit = 1, restarts = 1, points = 10^5),
     show.info = FALSE,
     holdout_task_id = NULL,
 
@@ -20,17 +20,21 @@ DefaultSearch = R6Class("DefaultSearch",
     defaults.params = list(),
     prd_aggregator = NULL,
     maximize = TRUE,
+    ps = NULL,
     y = NULL,
     best.y = - Inf,
     aggfun = NULL,
+    prefix = NULL,
 
-    initialize = function(sc, n_defaults = 10L, holdout_task_id, aggfun = "mean", fail_handle) {
+    initialize = function(sc, n_defaults = 10L, holdout_task_id, aggfun = "mean", fail_handle, prefix = NULL) {
       self$sc = assert_class(sc, "SurrogateCollection")$clone()
       self$n_defaults = assert_int(n_defaults)
+      self$prefix = assert_character(prefix, null.ok = TRUE)
       self$holdout_task_id = assert_int(holdout_task_id)
       self$sc$set_holdout_task(self$holdout_task_id)
       self$aggfun = assert_choice(aggfun, choices = c("mean", "median"))
       self$fail_handle = if(missing(fail_handle)) fail::fail(self$fail_path()) else assert_path_for_output(fail_handle)
+      self$ps = setNames(lapply(unique(self$sc$baselearners), surrogates:::get_param_set), unique(self$sc$baselearners))
     },
 
     # Search defaults as specified.
@@ -93,14 +97,14 @@ DefaultSearch = R6Class("DefaultSearch",
     generate_random_points = function(npoints, baselearners) {
       bl_props = round(npoints / length(baselearners))
       nd = lapply(baselearners, function(x) {
-        ps = get_param_set(x)
+
         # Generate random points for a given baselearner.
-        newdesign = generateRandomDesign(bl_props, ps, trafo = TRUE)
+        newdesign = generateRandomDesign(bl_props, self$ps[[x]], trafo = TRUE)
         newdesign = deleteNA(newdesign)
         newdesign = convertDataFrameCols(newdesign, ints.as.num = TRUE,  logicals.as.factor = TRUE)
         # Make sure we have enough points in newdesign and not too many
         while (nrow(newdesign) < bl_props) {
-          n2 = generateRandomDesign(bl_props, ps, trafo = TRUE)
+          n2 = generateRandomDesign(bl_props, self$ps[[x]], trafo = TRUE)
           n2 = deleteNA(n2)
           n2 = convertDataFrameCols(n2, ints.as.num = TRUE,  logicals.as.factor = TRUE)
           newdesign = rbind(newdesign, n2)
@@ -152,7 +156,8 @@ DefaultSearch = R6Class("DefaultSearch",
       meas = paste0(unique(self$sc$measures), collapse = "_")
       slrn = paste0(unique(self$sc$surrogate_learner), collapse = "_")
       scale = paste0(unique(self$sc$scaling), collapse = "_")
-      paste("defaults", lrns,
+      path = paste("defaults",
+        paste0(self$prefix, "_", lrns),
         paste0(slrn, "_surrogate"),
         paste(meas, scale, self$aggfun, sep = "_"),
         self$sc$holdout_task_id, sep = "/")

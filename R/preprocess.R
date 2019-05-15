@@ -6,12 +6,12 @@
 #' - learner_id:  Learner (see get_baselearners())
 #' - ...          The whole parameter set across all learners.
 #' @param bot_data Path to save the result to.
+#' @export
 figshare_to_data = function(bot_data = "data/oml_bot_data.RDS") {
   load(url("https://ndownloader.figshare.com/files/10462297"))
   lps = getLearnerParSets()
   tbl.metaFeatures = tbl.metaFeatures %>% filter(quality %in% c("NumberOfFeatures", "NumberOfInstances"))
 
-  browser()
   # Get a data.frame with all hpar <-> performance combinations
   learner_feats_list = tbl.hypPars %>%
     group_by(fullName) %>%
@@ -57,32 +57,32 @@ figshare_to_data = function(bot_data = "data/oml_bot_data.RDS") {
 #' @param baselearners  A vector of baselearners for which we want to create surrogates. Defaults to all in get_baselearners().
 #' @param measures      A vector of measures for which we want to create surrogates. Defaults to all in get_measures().
 #' @param surrogate_lrn A mlr [Learner]. Defaults to "regr.fixcubist".
+#' @export
 make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogate_lrn) {
 
-  if(missing(surrogate_lrn))
+  if (missing(surrogate_lrn)) {
     # Obtain fixed cubist from the internet
     source("https://raw.githubusercontent.com/pfistfl/mlr-extralearner/master/R/RLearner_regr_fixcubist.R")
-    surrogate_lrn = mlr::makeLearner("regr.fixcubist", committees = 20, extrapolation = 20)
-
+    surrogate_lrn = mlr::makeLearner("regr.fixcubist", committees = 20, extrapolation = 0)
+  }
   if (missing(oml_task_ids))
     oml_task_ids = get_oml_task_ids()
-
   if (missing(baselearners))
     baselearners = get_baselearners()
   if (missing(measures))
     measures = get_measures()
 
-  surrs = foreach(measure_name = "auc", .combine = "c") %:%
+  surrs = foreach(measure_name = measures, .combine = "c") %:%
     foreach(oml_task_id = oml_task_ids, .combine = "c") %:%
       foreach(baselearner_name = baselearners, .combine = "c") %do% {
-        s = SurrogateFromRDS$new(
-        oml_task_id = oml_task_id,
-        baselearner_name = baselearner_name,
-        data_source = "data/oml_bot_data.RDS",
-        measure_name = measure_name,
-        surrogate_learner = surrogate_lrn)
+        surrogates::SurrogateFromRDS$new(
+          oml_task_id = oml_task_id,
+          baselearner_name = baselearner_name,
+          data_source = "data/oml_bot_data.RDS",
+          measure_name = measure_name,
+          surrogate_learner = surrogate_lrn)
       }
-  sc = SurrogateCollection$new(surrs)
+  sc = surrogates::SurrogateCollection$new(surrs)
   return(sc)
 }
 
@@ -90,6 +90,7 @@ make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogat
 #' Train all surrogates for a given surrogate collection.
 #' @param sc [SurrogateCollection] if missing, calls make_surrogate_omlbot().
 #' @param overwrite should existing surrogates be overwritten?
+#' @export
 train_surrogates_omlbot = function(sc, overwrite = FALSE) {
   if (overwrite) unlink("surrogates", recursive = TRUE, force = TRUE)
   require(doParallel)
@@ -122,9 +123,10 @@ deleteNA = function(task.data) {
 
 # Convert wide to long
 to_long = function(res, lrn) {
+  requireNamespace("tidyr")
   res = data.frame(res)
   res$id = seq_len(32)
-  long = gather(res, "task", "auc", -id)
+  long = tidyr::gather(res, "task", "auc", -id)
   long$learner = lrn
   long
 }

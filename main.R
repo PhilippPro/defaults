@@ -1,24 +1,13 @@
 library(devtools)         # load_all()
-library(stringi)          # string manipulation
-library(focussearch)      # Search the surrogates
 library(foreach)
-library(R6)
 library(ParamHelpers)
 load_all()
-load_all("../surrogates") # Surrogates
 
 
 # Preprocessing Steps (only run once)
 # Step 1: Obtain OML Bot Data -> figshare_to_data()
 # Step 2: Train Surrogates    -> train_surrogates_omlbot()
 # Step 3: Search for the defaults -> calculate_defaults.R
-
-
-
-
-
-library(tidyr)
-
 
 
 df = rbind(
@@ -53,3 +42,4 @@ ggsave("defaults_cummax.pdf", p, width = 20, height = 10)
 p2 = ggplot(pdf, aes(x = as.factor(id), y = auc_max, color = learner)) +
   geom_boxplot()
 ggsave("defaults_comparison.pdf", p2, width = 20, height = 10)
+}
