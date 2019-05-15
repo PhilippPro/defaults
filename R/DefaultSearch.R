@@ -31,15 +31,16 @@ DefaultSearch = R6::R6Class("DefaultSearch",
     best.y = - Inf,
     aggfun = NULL,
 
-    initialize = function(sc, n_defaults = 10L, holdout_task_id, aggfun = "mean", fail_handle = NULL, prefix = NULL) {
+    initialize = function(sc, n_defaults = 10L, holdout_task_id, aggfun = "mean", fail_handle = NULL, save_folder = "data/intermediate", learner_prefix = NULL) {
       self$sc = assert_class(sc, "SurrogateCollection")$clone()
       self$n_defaults = assert_int(n_defaults)
 
-      self$holdout_task_id = assert_int(holdout_task_id)
-      self$sc$set_holdout_task(self$holdout_task_id)
+      self$holdout_task_id = assert_int(holdout_task_id, null.ok = TRUE)
+      if (!is.null(self$holdout_task_id))
+        self$sc$set_holdout_task(self$holdout_task_id)
 
       self$aggfun = assert_choice(aggfun, choices = c("mean", "median"))
-      self$fail_handle = if(!is.null(fail_handle)) fail::fail(self$fail_path(prefix)) else assert_path_for_output(fail_handle)
+      self$fail_handle = if(is.null(fail_handle)) fail::fail(self$fail_path(save_folder, learner_prefix)) else assert_path_for_output(fail_handle)
       self$ps = setNames(lapply(unique(self$sc$baselearners), get_param_set), unique(self$sc$baselearners))
     },
 
@@ -138,6 +139,8 @@ DefaultSearch = R6::R6Class("DefaultSearch",
     },
 
     evaluate_defaults_holdout = function() {
+      if (is.null(self$holdout_task_id))
+        stop("No holdout performance available, trained on all datasets!")
       out = self$sc$evaluate_holdout_task(self$defaults.params)
       res = do.call("rbind", lapply(out, fix_prds_names))
       self$fail_handle$put(keys = "holdout.perfs", res)
@@ -152,17 +155,22 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       }
     },
 
-    fail_path = function(prefix) {
+    fail_path = function(folder, prefix) {
+      assert_character(folder, null.ok = TRUE)
       assert_character(prefix, null.ok = TRUE)
       lrns = paste0(unique(self$sc$baselearners), collapse = "_")
       meas = paste0(unique(self$sc$measures), collapse = "_")
       slrn = paste0(unique(self$sc$surrogate_learner), collapse = "_")
       scale = paste0(unique(self$sc$scaling), collapse = "_")
-      path = paste("defaults",
+
+      if(is.null(self$holdout_task_id)) holdout_task_id = "full"
+      else holdout_task_id = self$sc$holdout_task_id
+
+      path = paste(folder, "defaults",
         paste0(prefix, "_", lrns),
         paste0(slrn, "_surrogate"),
         paste(meas, scale, self$aggfun, sep = "_"),
-        self$sc$holdout_task_id, sep = "/")
+        holdout_task_id, sep = "/")
     },
 
     acquire_defaults = function() {

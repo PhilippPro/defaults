@@ -1,0 +1,126 @@
+# Reproducing the Multiple Defaults Search
+
+```{r, eval = FALSE}
+# Loading required pacakges.
+library(devtools)
+library(doParallel)
+load_all()
+```
+
+
+# Step 1: Obtain OML Bot Data
+First we have to download all the data that is not already contained:
+This downloads the data from the OpenMLBot hosted on figshare, transforms it to
+a better usable format and saves to `data/input/oml_bot_data.Rds`.
+
+```{r, eval = FALSE}
+figshare_to_data()
+```
+
+we can look at the data using
+
+```{r, eval = FALSE}
+df = readRDS("data/input/oml_bot_data.RDS")
+```
+
+# Step 2: Search for the defaults
+
+In a second step we train the surrogate models and learn the defaults.
+This is done in the file `02_calculate_defaults.R`.
+
+We go through the process for a single example in order to explain what happens in the differnt
+steps.
+
+## Example: Find defaults for xgboost given
+
+```{r, eval = FALSE}
+# First we create a single surrogate model for each dataset.
+# We choose the baslearner "xgboost" and the measure "auc".
+# Note that this baselearner / measure has to be contained in the oml_bot_data.
+
+# The following code also fits a surrogate model for each dataset.
+sc = make_surrogates_omlbot(baselearners = "xgboost", measures = "auc")
+```
+
+Now we have prepared surrogate models (stored in `/data/intermediate/surrogates`), we can start
+learning defaults.
+
+For the evaluation, we learn a set of defaults, keeping out each `oml_task_id` once.
+We do this, setting a holdout_task_id.
+We aggregate over the different data sets using the `median`.
+Before running `.$search_defaults`, we set the upper limit for the `nround` param
+to `100L`.
+Afterwards we save the found defaults to disk and evaluate the holdout performance on the
+held out surrogate model.
+
+```{r, eval = FALSE}
+res_xgb_sub100 = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
+  ds = DefaultSearch$new(sc, 32L, holdout_task_id = oml_task_id, "median", prefix = "sub100")
+  ds$ps[["xgboost"]]$pars$nrounds$upper = 100L # We set the upper limit for nrounds to 100L
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}
+```
+
+This way, we obtain performances on held-out surrogate models. We can now simulate picking the best
+model by computing the maximum auc over the set of $1, 2, ..., 32$ defaults.
+This provides us with a good approximation, but assumes we have solved the model selection problem.
+
+In order to evaluate defaults in reality, we perform a search over the set of the first $n$ defaults in the
+ordered list using nested cross-validation. See Step 3 for more information.
+
+
+The default search uses evaluates $10^5$ random points from the surrogate and evaluates it according
+to the objective function defined by the selected aggregation method.
+
+### Searching for multiple defaults on the full data.
+
+```{r, eval = FALSE}
+ds = DefaultSearch$new(sc, 32L, holdout_task_id = NULL, "median", prefix = "sub100")
+ds$ps[["xgboost"]]$pars$nrounds$upper = 100L # We set the upper nrounds to 100L
+ds$search_defaults()
+ds$save_to_disk()
+```
+
+The found defaults are now stored in `df$defaults.params`.
+
+# Step 3: Evaluate default performance in a realistic setting.
+
+
+# Evaluate the results:
+```{r, eval = FALSE}
+df = rbind(
+  # to_long(res1, "xgb_svm"),
+  to_long(res_xgb, "xgboost"),
+  to_long(res_svm, "svm"),
+  to_long(res_all, "all"),
+  to_long(res_ranger, "ranger"),
+  to_long(res_glmnet, "glmnet")
+)
+
+library(ggplot2)
+library(patchwork)
+pdf = df %>%
+  arrange(learner, task, id) %>%
+  group_by(learner, task) %>%
+  mutate(auc_max = cummax(auc)) %>%
+  filter(id %in% c(1, 2, 4, 8, 16, 32))
+
+pdf %>% group_by(learner) %>% summarize(mean(auc_max))
+
+df2 = df %>%
+  arrange(learner, task, id) %>%
+  group_by(task) %>%
+  mutate(auc = (auc - min(auc)) / (max(auc) - min(auc))) %>%
+  group_by(task, learner) %>%
+  mutate(auc_norm_max = cummax(auc))
+
+p = ggplot(df2, aes(x = id, y = auc, color = learner)) + geom_line() + facet_wrap(~task)
+ggsave("defaults_cummax.pdf", p, width = 20, height = 10)
+
+p2 = ggplot(pdf, aes(x = as.factor(id), y = auc_max, color = learner)) +
+  geom_boxplot()
+ggsave("defaults_comparison.pdf", p2, width = 20, height = 10)
+}
+```
