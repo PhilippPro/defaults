@@ -74,7 +74,7 @@ make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogat
 
   surrs = foreach(measure_name = measures, .combine = "c") %:%
     foreach(oml_task_id = oml_task_ids, .combine = "c") %:%
-      foreach(baselearner_name = baselearners, .combine = "c") %do% {
+      foreach(baselearner_name = baselearners, .combine = "c") %dopar% {
         surrogates::SurrogateFromRDS$new(
           oml_task_id = oml_task_id,
           baselearner_name = baselearner_name,
