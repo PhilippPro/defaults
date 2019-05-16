@@ -55,7 +55,7 @@ held out surrogate model.
 
 ```{r, eval = FALSE}
 res_xgb_sub100 = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
-  ds = DefaultSearch$new(sc, 32L, holdout_task_id = oml_task_id, "median", prefix = "sub100")
+  ds = DefaultSearch$new(sc, 32L, holdout_task_id = oml_task_id, "median", learner_prefix = "sub100")
   ds$ps[["xgboost"]]$pars$nrounds$upper = 100L # We set the upper limit for nrounds to 100L
   ds$search_defaults()
   ds$save_to_disk()
@@ -77,8 +77,16 @@ to the objective function defined by the selected aggregation method.
 ### Searching for multiple defaults on the full data.
 
 ```{r, eval = FALSE}
-ds = DefaultSearch$new(sc, 32L, holdout_task_id = NULL, "median", prefix = "sub100")
+# Searching over all boosters
+ds = DefaultSearch$new(sc, 32L, holdout_task_id = NULL, "median", learner_prefix = "sub100")
 ds$ps[["xgboost"]]$pars$nrounds$upper = 100L # We set the upper nrounds to 100L
+ds$search_defaults()
+ds$save_to_disk()
+
+# Only tree booster
+ds = DefaultSearch$new(sc, 32L, holdout_task_id = NULL, "median", learner_prefix = "sub100_gbtree")
+ds$ps[["xgboost"]]$pars$nrounds$upper = 100L # We set the upper nrounds to 100L
+ds$ps[["xgboost"]]$pars$booster$values = list(gbtree = "gbtree")
 ds$search_defaults()
 ds$save_to_disk()
 ```

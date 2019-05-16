@@ -1,0 +1,39 @@
+# Reproducing the Multiple Defaults Search
+
+```{r, eval = FALSE}
+# Loading required pacakges.
+library(devtools)
+library(doParallel)
+load_all()
+```
+
+
+```{r, eval = FALSE}
+df = readRDS("data/input/oml_bot_data.RDS")
+```
+
+## Performance versus Runtime
+
+```{r}
+# Performance versus Runtime
+library(dplyr)
+library(ggplot2)
+task.id = 9952
+p = df %>%
+  mutate(color = if_else(is.na(kernel),
+    if_else(!is.na(booster),
+      paste0("booster:", as.character(booster)),
+      if_else(num.trees > 1000, ">1000 trees", "<1000 trees")
+    ),
+    paste0("kernel:" , as.character(kernel)))
+  ) %>%
+  mutate(color = as.factor(color)) %>%
+  filter(task_id == task.id) %>%
+  filter(learner_id %in% c("mlr.classif.xgboost", "mlr.classif.ranger", "mlr.classif.svm")) %>%
+  ggplot() +
+    geom_point(aes(x = performance, y = runtime, color = color), alpha = 0.3) +
+    facet_grid(learner_id ~ measure, scales = "free") +
+    scale_y_log10()
+# ggsave(p, filename = paste0("../../perf_vs_runtime_", task.id), device = "jpg")
+p
+```

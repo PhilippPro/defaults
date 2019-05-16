@@ -59,11 +59,14 @@ DefaultSearch = R6::R6Class("DefaultSearch",
         if (length(self$defaults.params) >= self$n_defaults) {
           messagef("Already found %s defaults!", self$n_defaults)
           break
+        } else {
+          if (self$show.info)
+            catf("Searching for default %i/%i:", j, self$n_defaults)
         }
 
         for (restart.iter in seq_len(self$ctrl$restarts)) {
-          if (self$show.info)
-            catf("Multistart %i of %i \n", restart.iter, control$restarts)
+          if (self$show.info & self$ctrl$restarts > 1)
+            catf("Multistart %i of %i \n", restart.iter, self$ctrl$restarts)
           for (local.iter in seq_len(self$ctrl$maxit)) {
             z = self$do_random_search()
             if (z$y > self$best.y) {
@@ -78,7 +81,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
         self$defaults.perf = rbind(self$defaults.perf, z$opt.prds)
         self$defaults.params = c(self$defaults.params, z$opt.params)
       }
-      if (self$show.info) print(defaults.params)
+      if (self$show.info) print(self$defaults.params)
     },
 
     # Do a random search on the surrogates
@@ -162,12 +165,13 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       meas = paste0(unique(self$sc$measures), collapse = "_")
       slrn = paste0(unique(self$sc$surrogate_learner), collapse = "_")
       scale = paste0(unique(self$sc$scaling), collapse = "_")
+      if (!is.null(prefix)) prefix = paste0(prefix, "_")
 
       if(is.null(self$holdout_task_id)) holdout_task_id = "full"
       else holdout_task_id = self$sc$holdout_task_id
 
       path = paste(folder, "defaults",
-        paste0(prefix, "_", lrns),
+        paste0(prefix, lrns),
         paste0(slrn, "_surrogate"),
         paste(meas, scale, self$aggfun, sep = "_"),
         holdout_task_id, sep = "/")
