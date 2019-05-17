@@ -43,6 +43,20 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       self$fail_handle = if(is.null(fail_handle)) fail::fail(self$fail_path(save_folder, learner_prefix)) else assert_path_for_output(fail_handle)
       self$ps = setNames(lapply(unique(self$sc$baselearners), get_param_set), unique(self$sc$baselearners))
     },
+    print = function(...) {
+      cat("Default Search for %s defaults", self$n_defaults)
+      if(!is.null(self$defaults.perf)) cat("Performances:\n"); print(self$defaults.perf)
+      if(!is.null(self$defaults.params))  cat("Defaults:\n"); print(self$defaults.params)
+    },
+    defaults_to_csv = function() {
+      stop("Not implemented yet!")
+      if(is.null(self$defaults.params)) {
+        stop("Defaults not yet available! run .$search_defaults")
+      } else {
+        path = paste0(save_folder, "/output")
+        write.csv(self$defaults.params)
+      }
+    },
 
     # Search defaults as specified.
     search_defaults = function(overwrite = FALSE) {

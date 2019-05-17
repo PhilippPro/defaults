@@ -1,58 +1,4 @@
-#' Preprocess figshare data
-#'
-#' Obtains data from figshare, saves a (long) data.frame with the following columns:
-#' - performance: Performance value
-#' - measure:     Measure (auc, acc, brier)
-#' - learner_id:  Learner (see get_baselearners())
-#' - ...          The whole parameter set across all learners.
-#' @param bot_data Path to save the result to.
-#' @export
-figshare_to_data = function(bot_data = "data/input/oml_bot_data.RDS") {
-  load(url("https://ndownloader.figshare.com/files/10462297"))
-  lps = getLearnerParSets()
-  tbl.metaFeatures = tbl.metaFeatures %>% filter(quality %in% c("NumberOfFeatures", "NumberOfInstances"))
 
-  # Get a data.frame with all hpar <-> performance combinations
-  learner_feats_list = tbl.hypPars %>%
-    group_by(fullName) %>%
-    do({
-      param.set = lps[[substr(paste0(unique(.$fullName), ".set"), 5, 10^3)]]$param.set
-      hpvals = spread(., name, value)
-
-      # Ensure correct data.types for params
-      params = getParamIds(param.set)
-      param_types = getParamTypes(param.set)
-      for(i in seq_along(params))
-        hpvals[, params[i]] = convertParamType(hpvals[[params[i]]], param_types[i])
-      bot.table = tbl.results %>%
-        dplyr::rename(acc = accuracy) %>%
-        gather("measure", "performance", -setup, -run_id, -task_id, -data_id) %>%
-        inner_join(hpvals, by = "setup") %>%
-        select(., -setup)
-
-      # Scale mtry and min.node.size in random forest
-      if (unique(.$fullName) == "mlr.classif.ranger") {
-        bot.table = bot.table %>%
-          inner_join(
-            filter(tbl.metaFeatures, quality == "NumberOfFeatures") %>% select(., -quality),
-            by = "data_id") %>%
-          mutate(mtry = mtry / as.numeric(value)) %>%
-          select(., -value) %>%
-          inner_join(
-            filter(tbl.metaFeatures, quality == "NumberOfInstances") %>% select(., -quality),
-            by = "data_id") %>%
-          mutate(min.node.size = log(min.node.size, 2) / log(as.numeric(value), 2)) %>%
-          select(., -value)
-      }
-      bot.table %>% rename(learner_id = fullName)
-  })
-  learner_feats_list = learner_feats_list %>%
-    left_join(tbl.runTime) %>%
-    select(-run_id) %>%
-    group_by(learner_id) %>%
-    select(-fullName)
-  saveRDS(file = bot_data, learner_feats_list)
-}
 
 
 #' Return a list of specified surrogates
@@ -61,7 +7,8 @@ figshare_to_data = function(bot_data = "data/input/oml_bot_data.RDS") {
 #' @param measures      A vector of measures for which we want to create surrogates. Defaults to all in get_measures().
 #' @param surrogate_lrn A mlr [Learner]. Defaults to "regr.fixcubist".
 #' @export
-make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogate_lrn) {
+make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogate_lrn,
+  data_source = "data/input/oml_bot_data.RDS", save_path = "data/intermediate/") {
 
   if (missing(surrogate_lrn)) {
     # Obtain fixed cubist from the internet
@@ -75,22 +22,35 @@ make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogat
   if (missing(measures))
     measures = get_measures()
 
+ # Make sure we aggregate correctly in case we have multiple baselearners:
+  if (length(baselearners) > 1L) {
+    ranges = get_ranges_multi_baselearners(data_source, baselearners, measures, oml_task_ids)
+  }
+
   surrs = foreach(measure_name = measures, .combine = "c") %:%
     foreach(oml_task_id = oml_task_ids, .combine = "c") %:%
       foreach(baselearner_name = baselearners, .combine = "c") %dopar% {
         s = surrogates::SurrogateFromRDS$new(
           oml_task_id = oml_task_id,
           baselearner_name = baselearner_name,
-          data_source = "data/input/oml_bot_data.RDS",
+          data_source = data_source,
           measure_name = measure_name,
           surrogate_learner = surrogate_lrn,
-          handle_prefix = "data/intermediate/")
+          handle_prefix = save_path)
+
+        # In case we have multiple baselearners, we set a different scale fun that
+        # correctly aggregates accross all learners
+        if (length(baselearners) > 1L) {
+          range = ranges[[measure_name]][ranges[[measure_name]]$task_id == oml_task_id, c("min", "max")]
+          s$scale_fun_pars = list(min = range$min, max = range$max)
+        }
         s$train()
         return(s)
-      }
+  }
   sc = surrogates::SurrogateCollection$new(surrs)
   return(sc)
 }
+
 
 
 #' Train all surrogates for a given surrogate collection.
@@ -143,99 +103,29 @@ fix_prds_names = function(x) {
   return(x)
 }
 
-getLearnerParSets = function(){
-
-  simple.lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.glmnet", predict.type = "prob"),
-    param.set = makeParamSet(
-      makeNumericParam("alpha", lower = 0, upper = 1, default = 1),
-      makeNumericVectorParam("lambda", len = 1L, lower = -10, upper = 10, default = 0 ,trafo = function(x) 2^x)))
-
-  simple.lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.rpart", predict.type = "prob"),
-    param.set = makeParamSet(
-      makeNumericParam("cp", lower = 0, upper = 1, default = 0.01),
-      makeIntegerParam("maxdepth", lower = 1, upper = 30, default = 30),
-      makeIntegerParam("minbucket", lower = 1, upper = 60, default = 1),
-      makeIntegerParam("minsplit", lower = 1, upper = 60, default = 20)),
-    lrn.ps.sets = simple.lrn.par.set)
-
-  # increase to a general param set
-  lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.kknn", predict.type = "prob"),
-    param.set = makeParamSet(
-      makeIntegerParam("k", lower = 1, upper = 30)),
-    lrn.ps.sets = simple.lrn.par.set)
-
-  lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.svm", predict.type = "prob"),
-    param.set = makeParamSet(
-      makeDiscreteParam("kernel", values = c("linear", "polynomial", "radial")),
-      makeNumericParam("cost", lower = -10, upper = 10, trafo = function(x) 2^x),
-      makeNumericParam("gamma", lower = -10, upper = 10, trafo = function(x) 2^x, requires = quote(kernel == "radial")),
-      makeIntegerParam("degree", lower = 2, upper = 5, requires = quote(kernel == "polynomial"))),
-    lrn.ps.sets = lrn.par.set)
-
-  lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.ranger", predict.type = "prob"),
-    param.set = makeParamSet(
-      makeIntegerParam("num.trees", lower = 1, upper = 2000),
-      makeLogicalParam("replace"),
-      makeNumericParam("sample.fraction", lower = 0.1, upper = 1),
-      makeNumericParam("mtry", lower = 0, upper = 1),
-      makeLogicalParam(id = "respect.unordered.factors"),
-      makeNumericParam("min.node.size", lower = 0, upper = 1)),
-    lrn.ps.sets = lrn.par.set)
-
-  lrn.par.set = makeLrnPsSets(learner = makeLearner("classif.xgboost", predict.type = "prob"),
-    param.set = makeParamSet(
-      makeIntegerParam("nrounds", lower = 1, upper = 5000),
-      makeDiscreteParam("booster", values = c("gbtree", "gblinear")),
-      makeNumericParam("eta", lower = -10, upper = 0, trafo = function(x) 2^x),
-      makeNumericParam("subsample",lower = 0.1, upper = 1, requires = quote(booster == "gbtree")),
-      makeIntegerParam("max_depth", lower = 1, upper = 15, requires = quote(booster == "gbtree")),
-      makeNumericParam("min_child_weight", lower = 0, upper = 7, requires = quote(booster == "gbtree"),
-        trafo = function(x) 2^x),
-      makeNumericParam("colsample_bytree", lower = 0, upper = 1, requires = quote(booster == "gbtree")),
-      makeNumericParam("colsample_bylevel", lower = 0, upper = 1, requires = quote(booster == "gbtree")),
-      makeNumericParam("lambda", lower = -10, upper = 10, trafo = function(x) 2^x,
-        requires = quote(booster == "gblinear")),
-      makeNumericParam("alpha", lower = -10, upper = 10, trafo = function(x) 2^x,
-        requires = quote(booster == "gblinear"))),
-    lrn.ps.sets = lrn.par.set)
-
-  return(lrn.par.set)
+get_ranges_multi_baselearners = function(data_source, baselearners, measures, oml_task_ids) {
+  d = readRDS(data_source) %>% filter(!is.na(performance)) %>% ungroup()
+  ranges = lapply(measures, function(measure) {
+    d %>%
+      filter(measure == measure) %>%
+      filter(learner_id %in% paste0("mlr.classif.", baselearners)) %>%
+      filter(task_id %in% oml_task_ids) %>%
+      group_by(task_id) %>%
+      summarise(min = min(performance), max = max(performance))
+  })
+  names(ranges) = measures
+  return(ranges)
 }
 
-makeLrnPsSets = function(learner, param.set, lrn.ps.sets = NULL,
-  id = paste0(learner$id, ".set"), overwrite = FALSE) {
-
-  assertClass(learner, "Learner")
-  assertClass(param.set, "ParamSet")
-  par.match = names(param.set$pars) %in% names(learner$par.set$pars)
-  if(all(par.match)){
-    ls = list(learner = learner, param.set = param.set)
-  } else {
-    stop(paste("The following parameters in param.set are not included in learner:",
-      paste(names(param.set$pars[par.match == FALSE]), collapse = ", ")))
-  }
-
-  if(is.null(lrn.ps.sets)){
-    lrn.ps.sets = list()
-    lrn.ps.sets[[id]] = ls
-    attr(lrn.ps.sets, "class") = "LrnPsSet"
-  } else {
-    assertClass(lrn.ps.sets, "LrnPsSet")
-
-    if(id %in% names(lrn.ps.sets) & overwrite == FALSE){
-      stop("tune.pair already contains id: \"", id, "\". Please specify a new id or set overwrite = TRUE.")
-    } else {
-      lrn.ps.sets[[id]] = ls
-    }
-  }
-
-  return(lrn.ps.sets)
-}
-
-convertParamType = function(x, param_type) {
-  if(param_type %in% c("integer", "numeric", "numericvector"))
-    x = as.numeric(x)
-  if(param_type %in% c("character", "logical", "factor", "discrete"))
-    x = as.factor(x)
-  return(x)
-}
+# scale_fun_multi_baselearners = function(x) {
+#   self$scaling = "normalize_multi"
+#   x = (x - self$scale_fun_pars$min) / (self$scale_fun_pars$max - self$scale_fun_pars$min)
+#   self$rescale_fun = function(x) {
+#     if (min(x) == max(x)) {
+#       self$scale_fun_pars$min
+#     } else {
+#       (x * (self$scale_fun_pars$max - self$scale_fun_pars$min)) + self$scale_fun_pars$min
+#     }
+#   }
+#   return(x)
+# }
