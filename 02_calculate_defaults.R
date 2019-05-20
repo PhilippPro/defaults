@@ -5,8 +5,11 @@ library(devtools)
 library(doParallel)
 library(surrogates)
 load_all()
-registerDoParallel(10)
+load_all("../surrogates")
+registerDoParallel(19)
 
+
+# -----------  Optimizing AUC for different learners:-------------------------------------
 # xgboost
 sc = make_surrogates_omlbot(baselearners = "xgboost", measures = "auc")
 res_xgb = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
@@ -57,12 +60,56 @@ res_all = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% 
   ds$get_holdout_performance()
 }
 
-# Not sure if we want to do this: svm, and xgboost
-# sc = make_surrogates_omlbot(baselearners = c("svm", "xgboost"), measures = "auc")
-#  res1 = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
-#   # Search 32Defaults, hold out task x
-#   ds = DefaultSearch$new(sc, 32L, oml_task_id, "median")
-#   ds$search_defaults()
-#   ds$save_to_disk()
-#   ds$get_holdout_performance()
-# }
+
+# -----------  Optimizing AUC scaled by runtime for different learners:-------------------
+
+# xgboost
+sc = make_surrogates_runtime_omlbot(baselearners = "xgboost", measures = "auc")
+res_xgb_timeres_xgb_time = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
+  # Search 32 Defaults, hold out task x
+  ds = DefaultSearch$new(sc, 32L, oml_task_id, "median")
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}
+
+# svm
+sc = make_surrogates_runtime_omlbot(baselearners = "svm", measures = "auc")
+res_svm = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
+  # Search 32 Defaults, hold out task x
+  ds = DefaultSearch$new(sc, 32L, oml_task_id, "median")
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}
+
+# ranger
+sc = make_surrogates_runtime_omlbot(baselearners = "ranger", measures = "auc")
+res_ranger = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
+  # Search 32 Defaults, hold out task x
+  ds = DefaultSearch$new(sc, 32L, oml_task_id, "median")
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$evaluate_defaults_holdout()
+}
+
+# glmnet
+sc = make_surrogates_runtime_omlbot(baselearners = "glmnet", measures = "auc")
+res_glmnet = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
+  # Search 32 Defaults, hold out task x
+  ds = DefaultSearch$new(sc, 32L, oml_task_id, "median")
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}
+
+# Defaults across all learners
+sc = make_surrogates_runtime_omlbot(baselearners = c("svm", "xgboost", "ranger", "glmnet", "rpart"), measures = "auc")
+res_all = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
+  # Search 32 Defaults, hold out task x
+  ds = DefaultSearch$new(sc, 32L, holdout_task_id = oml_task_id, "median")
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}
+

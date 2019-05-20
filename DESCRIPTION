@@ -8,6 +8,7 @@ Encoding: UTF-8
 LazyData: true
 Depends:
   R (>= 3.3.3),
+  R6,
   mlr (>= 2.10),
   ParamHelpers (>= 1.8),
   OpenML (>= 1.2),
