@@ -15,6 +15,8 @@ SurrogateWithRuntimeFromRDS = R6::R6Class("SurrogateWithRuntimeFromRDS",
   public = list(
     data_source = NULL,
     scaling = "normalize_time",
+    scale_fun_pars = NULL,
+
     # Parameters that scale the performance with runtime
     offset = 10,
     base = 10,
@@ -31,7 +33,7 @@ SurrogateWithRuntimeFromRDS = R6::R6Class("SurrogateWithRuntimeFromRDS",
       x = x[!is.na(x)]
       if (is.null(self$scale_fun_pars)) {
         # FIXME: Implement different options for this or expose BBmisc::normalize args
-        self$scale_fun_pars = c(min = min(x), max = max(x))
+        self$scale_fun_pars = list(min = min(x), max = max(x))
         x = BBmisc::normalize(x, "range")
       } else {
         # In case we want to set the normalization from outside

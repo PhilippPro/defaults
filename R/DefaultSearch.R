@@ -67,6 +67,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       if (overwrite) self$clear()
       if (length(self$defaults.params) == 0L)
         self$acquire_defaults()
+
       # Compute n_defaults  default parameters iteratively
       # Defaults from earlier iterations influence later ones.
       for (j in seq_len(self$n_defaults)) {
@@ -77,19 +78,12 @@ DefaultSearch = R6::R6Class("DefaultSearch",
           if (self$show.info)
             catf("Searching for default %i/%i:", j, self$n_defaults)
         }
-
-        for (restart.iter in seq_len(self$ctrl$restarts)) {
-          if (self$show.info & self$ctrl$restarts > 1)
-            catf("Multistart %i of %i \n", restart.iter, self$ctrl$restarts)
-          for (local.iter in seq_len(self$ctrl$maxit)) {
-            z = self$do_random_search()
-            if (z$y > self$best.y) {
-              if (self$show.info)
-                catf("New best y: %f found for x: %s \n", z$y, paste0(z$opt.params, collapse = ", "))
-              self$best.y = z$y
-              self$y = c(self$y, z$y)
-            }
-          }
+        z = self$do_random_search()
+        if (z$y > self$best.y) {
+          if (self$show.info)
+            catf("New best y: %f found for x: %s \n", z$y, paste0(z$opt.params, collapse = ", "))
+          self$best.y = z$y
+          self$y = c(self$y, z$y)
         }
         # Save found defaults and their performances
         self$defaults.perf = rbind(self$defaults.perf, z$opt.prds)
@@ -150,7 +144,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
         if (!self$maximize) x = -x
         # Parallel minimum with current best
         pmax = apply(x, 1, function(x) pmax(x, self$best.perfs))
-        # Compute mean
+        # Compute mean/medianpr
         pmed = apply(pmax, 2, fun)
       })
     },

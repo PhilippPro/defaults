@@ -6,7 +6,7 @@ library(doParallel)
 library(surrogates)
 load_all()
 load_all("../surrogates")
-registerDoParallel(19)
+registerDoParallel(6)
 
 
 # -----------  Optimizing AUC for different learners:-------------------------------------
@@ -65,7 +65,7 @@ res_all = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% 
 
 # xgboost
 sc = make_surrogates_runtime_omlbot(baselearners = "xgboost", measures = "auc")
-res_xgb_timeres_xgb_time = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
+res_xgb_timesense = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
   # Search 32 Defaults, hold out task x
   ds = DefaultSearch$new(sc, 32L, oml_task_id, "median")
   ds$search_defaults()
@@ -109,6 +109,8 @@ res_all = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% 
   # Search 32 Defaults, hold out task x
   ds = DefaultSearch$new(sc, 32L, holdout_task_id = oml_task_id, "median")
   ds$search_defaults()
+  ds$ctrl$points = 10L
+  ds$show.info = TRUE
   ds$save_to_disk()
   ds$get_holdout_performance()
 }
