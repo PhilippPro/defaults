@@ -109,8 +109,6 @@ res_all = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% 
   # Search 32 Defaults, hold out task x
   ds = DefaultSearch$new(sc, 32L, holdout_task_id = oml_task_id, "median")
   ds$search_defaults()
-  ds$ctrl$points = 10L
-  ds$show.info = TRUE
   ds$save_to_disk()
   ds$get_holdout_performance()
 }

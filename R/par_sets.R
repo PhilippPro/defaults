@@ -15,7 +15,7 @@ get_param_set = function(lrn.cl) {
   switch(lrn.cl,
   "classif.glmnet" = makeParamSet(
       makeNumericParam("alpha", lower = 0, upper = 1, default = 1),
-      makeNumericVectorParam("lambda", len = 1L, lower = -10, upper = 10, default = 0 ,trafo = function(x) 2^x)),
+      makeNumericVectorParam("lambda", len = 1L, lower = -10, upper = 10, default = 0, trafo = function(x) 2^x)),
 
   "classif.rpart" = makeParamSet(
       makeNumericParam("cp", lower = 0, upper = 1, default = 0.01),
