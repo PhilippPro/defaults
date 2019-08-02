@@ -19,7 +19,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
     holdout_task_id = NULL,
     n_defaults = NULL,
     show.info = FALSE,
-    ctrl = focussearch::makeFocusSearchControl(maxit = 1, restarts = 1, points = 10^5),
+    ctrl = focussearch::makeFocusSearchControl(maxit = 1, restarts = 1, points = 10^4),
     ps = NULL,
 
     defaults.perf = NULL,

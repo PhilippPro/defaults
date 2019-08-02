@@ -1,7 +1,7 @@
 # Reproducing the Multiple Defaults Search
 
 ```{r, eval = FALSE}
-# Loading required pacakges.
+# Loading required packages.
 library(devtools)
 load_all()
 ```
@@ -65,4 +65,55 @@ p = df %>%
     facet_grid(learner_id ~ measure, scales = "free")
 ggsave(p, filename = paste0("../../perf_vs_runtime_logscaled", task.id), device = "jpg")
 p
+```
+
+
+## Performance without surrogates (in sample)
+
+This section tries to explore the trade-off between runtime and performance in an overly optimistic manner:
+We compute a performance criterion (see comments below) and look for a point that optimizes the given criterion in-sample.
+We then compare to the fastest configuration that achieved the maximum AUC.
+
+```{r}
+# Convert to data.table for speedup
+dt = as.data.table(df)[!is.na(performance) & !is.na(runtime) , .(runtime = runtime + 1, performance, measure, learner_id, data_id)]
+dt = dt[runtime > 0, ]
+
+
+
+# We use formulae of the form performance / log(runtime + base, base = base)^pow i.e.
+# we scale the denominator (runtime).
+
+dtout = data.table()
+for (bs in c(1.001, 1.01, 2, 5, 10, 20)) {
+for (pow in c(0.01, 0.1, 0.5, 1, 2, 10)) {
+  dt2 = dt[measure == "auc" & learner_id == "mlr.classif.rpart", .(perf_by_time = performance / log(runtime + bs, base = bs)^pow, performance, runtime), by = .(data_id)]
+
+  dt3 = merge(
+    dt2[, .(performance, runtime, perf_by_time, pbt = max(perf_by_time)), by = .(data_id)][perf_by_time == pbt, ],
+    dt2[, .(runtime, performance, pm = max(performance)), by = .(data_id)][performance == pm,],
+    by = "data_id"
+  )
+
+  dtn = merge(
+    dt3[, .(runtime_pct = runtime.x / runtime.y, perf_pct = performance.x / performance.y, data_id)],
+    dt3[, .(max_runtime_pct = max(runtime.x / runtime.y)), by = "data_id"],
+    by = "data_id"
+  )
+  dtout = rbind(dtout, dtn[max_runtime_pct == runtime_pct,][, .(perf_pct = mean(perf_pct), runtime_pct = mean(runtime_pct))])
+}
+}
+
+p = ggplot(dtout, aes(perf_pct, runtime_pct)) + geom_point()  + geom_line() + xlab("Percent of max auc") + ylab("Percent of runtime to achieve best auc")
+ggsave(p,  file = "../perf_vs_runtime_rpart.pdf")
+
+# In-sample result:
+# bs:10, power: 0.1
+#    perf_pct runtime_pct
+#    0.9905      0.1046
+# => We can get 99.05% of average performance for 10.46% of computation time
+# bs: 10, power: 1
+#   perf_pct runtime_pct
+#    0.9643     0.08621
+# => We can get 96.43% of avg performance for 8.6% of computation time
 ```

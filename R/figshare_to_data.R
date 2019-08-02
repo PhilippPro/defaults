@@ -143,11 +143,3 @@ makeLrnPsSets = function(learner, param.set, lrn.ps.sets = NULL,
 
   return(lrn.ps.sets)
 }
-
-convertParamType = function(x, param_type) {
-  if(param_type %in% c("integer", "numeric", "numericvector"))
-    x = as.numeric(x)
-  if(param_type %in% c("character", "logical", "factor", "discrete"))
-    x = as.factor(x)
-  return(x)
-}
