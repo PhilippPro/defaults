@@ -31,7 +31,7 @@ This is done in the file `02_calculate_defaults.R`.
 We go through the process for a single example in order to explain what happens in the differnt
 steps.
 
-## Example: Find defaults for xgboost given
+## Example: Find defaults for xgboost
 
 ```{r, eval = FALSE}
 # First we create a single surrogate model for each dataset.

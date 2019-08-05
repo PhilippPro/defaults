@@ -12,10 +12,10 @@ registerDoSEQ()
 
 # -----------  Optimizing AUC for different learners:-------------------------------------
 # xgboost
-sc = make_surrogates_omlbot(baselearners = "xgboost", measures = "auc")
+sc = make_surrogates_omlbot(baselearners = "xgboost", measures = "auc", timecrit = FALSE)
 res_xgb = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
   # Search 32 Defaults, hold out task x
-  ds = DefaultSearch$new(sc, 8L, oml_task_id, "median")
+  ds = DefaultSearch$new(sc, 16L, oml_task_id, "median")
   ds$search_defaults()
   ds$save_to_disk()
   ds$get_holdout_performance()
@@ -64,20 +64,24 @@ res_all = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% 
 
 # -----------  Optimizing AUC scaled by runtime for different learners:-------------------
 # xgboost
-sc = make_surrogates_omlbot(baselearners = "xgboost", measures = "auc", timecrit = TRUE)
+sc_xgbt = make_surrogates_omlbot(baselearners = "xgboost", measures = "auc", timecrit = TRUE)
+sc_xgb  = make_surrogates_omlbot(baselearners = "xgboost", measures = "auc") # Get OOB Performance
 res_xgb_timesense = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
   # Search 32 Defaults, hold out task x
-  ds = DefaultSearch$new(sc, 32L, oml_task_id, "median")
+  ds = DefaultSearch$new(sc_xgbt, 16L, oml_task_id, "median")
   ds$search_defaults()
   ds$save_to_disk()
-  ds$get_holdout_performance()
+  # Get holdout performance
+  df = data.frame(unlist(sc_xgb$predict(ds$defaults.params, oml_task_id)))
+  colnames(df) = paste0(oml_task_id, "_auc")
+  return(df)
 }
 
 # svm
 sc = make_surrogates_runtime_omlbot(baselearners = "svm", measures = "auc")
 res_svm = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
   # Search 32 Defaults, hold out task x
-  ds = DefaultSearch$new(sc, 32L, oml_task_id, "median")
+  ds = DefaultSearch$new(sc, 8L, oml_task_id, "median")
   ds$search_defaults()
   ds$save_to_disk()
   ds$get_holdout_performance()
@@ -113,3 +117,64 @@ res_all = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% 
   ds$get_holdout_performance()
 }
 
+# -----------  Random Search:-------------------------------------
+sc = make_surrogates_omlbot(baselearners = "xgboost", measures = "auc")
+ds = DefaultSearch$new(sc, 16L, holdout_task_id = NULL, "median")
+
+res_xgb_rs = foreach(n_points = seq_len(16), .combine = "rbind") %dopar% {
+      res = replicate(30, { # 30 Replications to reduce stochasticity
+        ds$ctrl$points = n_points
+        ds$do_random_search()$opt.prds
+      })
+      apply(res, 2, mean)
+}
+
+res_xgb_rs2 = foreach(n_points = seq_len(16)*2, .combine = "rbind") %dopar% {
+      res = replicate(30, { # 30 Replications to reduce stochasticity
+        ds$ctrl$points = n_points
+        ds$do_random_search()$opt.prds
+      })
+      apply(res, 2, mean)
+}
+
+res_xgb_rs4 = foreach(n_points = seq_len(16)*4, .combine = "rbind") %dopar% {
+      res = replicate(30, {
+        ds$ctrl$points = n_points
+        ds$do_random_search()$opt.prds
+      })
+      apply(res, 2, mean)
+}
+
+
+# -----------  Runtime Prediction:--------------------------------------------------------
+sc_xgb_runtime = make_surrogates_omlbot(baselearners = "xgboost", measures = "runtime")
+ds = DefaultSearch$new(sc_xgb_runtime, 16L, holdout_task_id = NULL, "median")
+res_xgb_rs_t = foreach(n_points = seq_len(16), .combine = "rbind") %dopar% {
+      res = replicate(30, { # 30 Replications to reduce stochasticity
+        ds$ctrl$points = n_points
+        ds$do_random_search()$opt.prds
+      })
+      apply(res, 2, mean)
+}
+
+res_xgb_tc_t = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
+  # Search 32 Defaults, hold out task x
+  ds = DefaultSearch$new(sc_xgbt, 16L, oml_task_id, "median")
+  ds$search_defaults()
+  ds$save_to_disk()
+  # Get holdout performance
+  df = data.frame(unlist(sc_xgb_runtime$predict(ds$defaults.params, oml_task_id)))
+  colnames(df) = paste0(oml_task_id, "_auc")
+  return(df)
+}
+
+res_xgb_def_t = foreach(oml_task_id = get_oml_task_ids(), .combine = "cbind") %dopar% {
+  # Search 32 Defaults, hold out task x
+  ds = DefaultSearch$new(sc_xgb, 16L, oml_task_id, "median")
+  ds$search_defaults()
+  ds$save_to_disk()
+  # Get holdout performance
+  df = data.frame(unlist(sc_xgb_runtime$predict(ds$defaults.params, oml_task_id)))
+  colnames(df) = paste0(oml_task_id, "_auc")
+  return(df)
+}

@@ -44,7 +44,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       self$ps = setNames(lapply(unique(self$sc$baselearners), get_param_set), unique(self$sc$baselearners))
     },
     print = function(...) {
-      cat("Default Search for %s defaults", self$n_defaults)
+      catf("Default Search for %s defaults", self$n_defaults)
       if(!is.null(self$defaults.perf)) cat("Performances:\n"); print(self$defaults.perf)
       if(!is.null(self$defaults.params))  cat("Defaults:\n"); print(self$defaults.params)
     },
@@ -93,9 +93,9 @@ DefaultSearch = R6::R6Class("DefaultSearch",
     },
 
     # Do a random search on the surrogates
-    do_random_search = function() {
+    do_random_search = function(rescale = FALSE) {
       pts = self$generate_random_points(self$ctrl$points, unique(self$sc$baselearners))
-      prds = self$sc$predict(pts)
+      prds = self$sc$predict(pts, rescale = rescale)
       prds = lapply(prds, fix_prds_names)
       # Compute the aggregation
       prds.agg = self$objfun(prds)
@@ -118,7 +118,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
 
         # Generate random points for a given baselearner.
         newdesign = generateRandomDesign(bl_props, self$ps[[x]], trafo = TRUE)
-        newdesign = deleteNA(newdesign)
+        newdesign = out_of_parset_imputer(newdesign, self$ps[[x]])
         newdesign = convertDataFrameCols(newdesign, ints.as.num = TRUE,  logicals.as.factor = TRUE)
         # Make sure we have enough points in newdesign and not too many
         while (nrow(newdesign) < bl_props) {
@@ -172,7 +172,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       lrns = paste0(unique(self$sc$baselearners), collapse = "_")
       meas = paste0(unique(self$sc$measures), collapse = "_")
       slrn = paste0(unique(self$sc$surrogate_learner), collapse = "_")
-      scale = paste0(unique(self$sc$scaling), collapse = "_")
+      scale = paste0(self$sc$scalings, collapse = "_")
       if (!is.null(prefix)) prefix = paste0(prefix, "_")
 
       if(is.null(self$holdout_task_id)) holdout_task_id = "full"

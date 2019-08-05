@@ -1,17 +1,19 @@
-#' Substitute NA's with out of bounds data.
-deleteNA = function(task.data) {
-  for(i in 1:ncol(task.data)) {
-    if(is.numeric(task.data[, i]))
-      task.data[is.na(task.data[, i]), i] = -10 - 1
-    if(is.factor(task.data[, i])) {
-      task.data[, i] = addNA(task.data[, i])
-      task.data[, i] = droplevels(task.data[, i])
-    }
-    if(is.logical(task.data[, i]))
-      task.data[, i] = as.factor(task.data[, i])
-  }
-  task.data
-}
+# #' Substitute NA's with out of bounds data.
+# deleteNA = function(task.data) {
+#   for(i in 1:ncol(task.data)) {
+#     if(is.numeric(task.data[, i]))
+#       task.data[is.na(task.data[, i]), i] = -10 - 1
+#     if(is.factor(task.data[, i])) {
+#       task.data[, i] = addNA(task.data[, i])
+#       task.data[, i] = droplevels(task.data[, i])
+#     }
+#     if(is.logical(task.data[, i]))
+#       task.data[, i] = as.factor(task.data[, i])
+#   }
+#   task.data
+# }
+
+
 
 # Convert wide to long
 to_long = function(res, lrn) {
@@ -62,10 +64,11 @@ load_from_rds = function(self) {
   data = as.data.table(readRDS(self$data_source))
   colnames(data)[colnames(data) == self$eval_measure] = "performance"
   # Scale performance column
-  data$performance[data$task_id == self$oml_task_id] = self$scaler$scale(data, oml_task_id = self$oml_task_id)
+  data$performance[data$task_id == self$oml_task_id] = self$scaler$scale(data, oml_task_id = self$oml_task_id, runtime = "runtime")
   # Subset columns, only relevant data
   self$param_names = intersect(getParamIds(self$param_set), colnames(data))
   data = data[(data$task_id == self$oml_task_id) & (data$learner_id == paste0("mlr.classif.", self$base_learner)),  c("performance", self$param_names)]
+  # Impute NA's with out-of-paramset values
   data = out_of_parset_imputer(data, self$param_set)
   return(data)
 }
@@ -73,17 +76,22 @@ load_from_rds = function(self) {
 # Impute all NA's using an out-of-paramset value
 out_of_parset_imputer = function(data, ps) {
   nacols = colnames(data)[sapply(data, anyNA)]
+  # Get imputation values
   out_vals = sapply(ps$pars[nacols], function(x) {
     if (x$type %in% c("integer", "numeric"))
-    return(x$lower - 1)
-    else if (x$type %in% c("integer", "numeric"))
-    return("_NA_")
+      return(x$lower - 1)
+    else if (x$type %in% c("factor", "logical"))
+      return("_NA_")
   })
   data[, nacols] = sapply(nacols, function(x) {
+    # Convert logicals to factors
+    if (is.logical(data[[x]])) data[[x]] = as.character(data[[x]])
+    # Replace NA's
     data[is.na(data[[x]]), x] = out_vals[x]
+    # character -> factor
+    if (is.character(data[[x]])) data[[x]] = as.factor(data[[x]])
     return(data[[x]])
   })
-  browser()
   return(data)
 }
 

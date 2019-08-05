@@ -6,7 +6,7 @@
 #' @export
 make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogate_lrn,
   data_source = "data/input/oml_bot_data.RDS", save_path = "data/intermediate/",
-  timecrit = TRUE) {
+  timecrit = FALSE) {
 
   if (missing(surrogate_lrn)) {
     # Obtain fixed cubist from the internet
@@ -43,6 +43,7 @@ make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogat
           param_set = get_param_set(paste0("classif.", base_learner)),
           save_path = "data/intermediate/",
           scaler = scaler)$train()
+
   }
   sc = surrogates::SurrogateCollection$new(surrs)
   return(sc)
