@@ -29,15 +29,17 @@ make_autosklearner = function(n, baselearner, setting = "metalearn") {
 run_single_cfg = function(baselearner, task_id, n, baseline_setting, fail_handle) {
   cfg = paste("run", baselearner, task_id, n, baseline_setting, sep = "_")
   if (!(cfg %in% fail_handle$ls())) {
-    parallelMap::parallelStartMulticore(10)
+    sprintf("Computing %s", cfg)
     lrn = make_autosklearner(n, baselearner = baselearner)
     lrn = makeDummyFeaturesWrapper(lrn)
     lrn = makeRemoveConstantFeaturesWrapper(lrn)
+    browser()
     lrn = setLearnerId(lrn,
       paste("autosklearn", baseline_setting, n, paste0(baselearner, collapse = "_"), sep = "_"))
     tsk = getOMLTask(task_id)
     run = OpenML::runTaskMlr(tsk, lrn)
     fail_handle$put(run, keys = cfg)
+    sprintf("Saved %s", cfg)
   } else {
     run = fail_handle$get(cfg)
   }
@@ -51,15 +53,19 @@ compute_baselines = function() {
   TASK_IDS = oml100$task.id
   BASELEARNERS = "random_forest" # c("random_forest", "adaboost", "libsvm_svc")
   BASELINE_SETTINGS = "smac" # c("metalearn", "smac")
-  N_EVALS = c(1, 2, 4, 8) # , 4, 8) # 16, 32)
+  N_EVALS = c(1, 2) # , 4, 8) # 16, 32)
 
   fail_handle = fail::fail("baselines/results")
-  # registerDoParallel(3)
   foreach(baseline_setting = BASELINE_SETTINGS) %:%
     foreach(baselearner = BASELEARNERS) %:%
       foreach(n = N_EVALS) %:%
-        foreach(task_id = TASK_IDS) %dopar% {
+        foreach(task_id = TASK_IDS) %do% {
+          parallelMap::parallelStartMulticore(10, level = "mlr.resample")
+          parallelMap::parallelExport("make_autosklearner")
+          parallelMap::parallelLibrary("mlr")
+          parallelMap::parallelSource("R/RLearner_classif_autosklearn.R")
           run_single_cfg(baselearner, task_id, n, baseline_setting, fail_handle)
+          parallelMap::parallelStop()
         }
 }
 

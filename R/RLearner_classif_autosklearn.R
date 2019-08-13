@@ -42,7 +42,7 @@ trainLearner.classif.autosklearn = function(.learner, .task, .subset, .weights =
 
   autosklearn = import("autosklearn")
   classifier = autosklearn$classification$AutoSklearnClassifier(...)
-
+  browser()
   train = getTaskData(.task, .subset, target.extra = TRUE)
   feat.type = ifelse(vlapply(train$data, is.factor), "Categorical", "Numerical")
   classifier$fit(as.matrix(train$data), train$target, feat_type = feat.type)
