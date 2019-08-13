@@ -95,3 +95,9 @@ out_of_parset_imputer = function(data, ps) {
   return(data)
 }
 
+#' Get holdout performance from unscaled surrogates
+get_holdout_perf = function(sc, defaults.params, oml_task_id) {
+  df = data.frame(unlist(sc$predict(defaults.params, oml_task_id)))
+  colnames(df) = paste0(oml_task_id, "_auc")
+  return(df)
+}
