@@ -16,4 +16,5 @@ packrat/lib*
 packrat/src/
 packrat/*
 packrat/lib*/
+*.pdf
 .ipynb_checkpoints/*

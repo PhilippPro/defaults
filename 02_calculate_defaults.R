@@ -7,13 +7,13 @@ library(surrogates)
 load_all()
 load_all("../surrogates")
 registerDoParallel(8)
-registerDoSEQ()
 
 # -----------  Constants  -------------------------------------------------------
 n_defaults = 16
 measures = "auc"
 aggfun = "median"
 oml_task_ids = get_oml_task_ids()
+
 
 # -----------  Optimizing AUC for different learners:----------------------------
 # xgboost
@@ -27,6 +27,7 @@ res_xgb = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 }
 
 # svm
+<<<<<<< HEAD
 sc_svm = make_surrogates_omlbot(baselearners = "svm", measures = measures)
 res_svm = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
@@ -37,6 +38,7 @@ res_svm = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 }
 
 # ranger
+<<<<<<< HEAD
 sc_ranger = make_surrogates_omlbot(baselearners = "ranger", measures = measures)
 res_ranger = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
@@ -47,6 +49,7 @@ res_ranger = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 }
 
 # glmnet
+<<<<<<< HEAD
 sc_glmnet = make_surrogates_omlbot(baselearners = "glmnet", measures = measures)
 res_glmnet = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
@@ -65,8 +68,6 @@ res_all = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   ds$save_to_disk()
   ds$get_holdout_performance()
 }
-
-
 
 # -----------  Optimizing AUC scaled by runtime for different learners:-------------------
 
@@ -125,7 +126,12 @@ res_allt = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 
 # -----------  Runtime Prediction:--------------------------------------------------------
 sc_xgb_runtime = make_surrogates_omlbot(baselearners = "xgboost", measures = "runtime")
+<<<<<<< HEAD
 ds = DefaultSearch$new(sc_xgb_runtime, n_defaults, holdout_task_id = NULL, aggfun)
+=======
+
+ds = DefaultSearch$new(sc_xgb_runtime, 16L, holdout_task_id = NULL, "median")
+>>>>>>> 26b37a046eaa20dc29f4cdcaf321e81860e8b2bd
 res_xgb_rs_t = foreach(n_points = seq_len(16), .combine = "rbind") %dopar% {
       res = replicate(30, { # 30 Replications to reduce stochasticity
         ds$ctrl$points = n_points
