@@ -1,13 +1,14 @@
 Package: defaults
 Title: Calculate default settings
 Version: 0.0.0.1
-Authors@R: person("Philipp", "Probst", email = "philipp_probst@gmx.de", role = c("aut", "cre"))
+Authors@R: person("Florian", "Pfisterer", email = "pfistererf@googlemail.com", role = c("aut", "cre"))
 Description: Calculate defaults based on results of the OpenML bot.
 License: GPL-2
 Encoding: UTF-8
 LazyData: true
 Depends:
   R (>= 3.3.3),
+  R6,
   mlr (>= 2.10),
   ParamHelpers (>= 1.8),
   OpenML (>= 1.2),
@@ -18,7 +19,6 @@ Depends:
   checkmate (>= 1.8.0),
   tidyr (>= 0.6.1),
   stringi (>= 1.1.2),
-  focussearch,
   ggplot2,
   farff,
   foreach,
@@ -32,5 +32,9 @@ Depends:
   xgboost,
   e1071,
   kknn,
-  ggpubr,
-  patchwork
+  ggpubr
+Remotes:
+  pfistfl/focussearch,
+  thomasp/patchwork,
+  compstat-lmu/surrogates
+
