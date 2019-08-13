@@ -149,20 +149,23 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       })
     },
 
-    evaluate_defaults_holdout = function() {
+    evaluate_defaults_holdout = function(sc = NULL) {
+      if (is.null(sc)) sc = self$sc
       if (is.null(self$holdout_task_id))
         stop("No holdout performance available, trained on all datasets!")
-      out = self$sc$evaluate_holdout_task(self$defaults.params)
+      sc$set_holdout_task(self$holdout_task_id)
+      out = sc$evaluate_holdout_task(self$defaults.params)
       res = do.call("rbind", lapply(out, fix_prds_names))
       self$fail_handle$put(keys = "holdout.perfs", res)
       return(res)
     },
 
-    get_holdout_performance = function(overwrite = FALSE) {
+    get_holdout_performance = function(sc = NULL, overwrite = FALSE) {
+      if (!is.null(sc)) assert_class(sc, "SurrogateCollection")
       if ("holdout.perfs" %in% self$fail_handle$ls() && !overwrite) {
         self$fail_handle$get("holdout.perfs")
       } else {
-        self$evaluate_defaults_holdout()
+        self$evaluate_defaults_holdout(sc)
       }
     },
 

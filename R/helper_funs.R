@@ -1,21 +1,4 @@
-# #' Substitute NA's with out of bounds data.
-# deleteNA = function(task.data) {
-#   for(i in 1:ncol(task.data)) {
-#     if(is.numeric(task.data[, i]))
-#       task.data[is.na(task.data[, i]), i] = -10 - 1
-#     if(is.factor(task.data[, i])) {
-#       task.data[, i] = addNA(task.data[, i])
-#       task.data[, i] = droplevels(task.data[, i])
-#     }
-#     if(is.logical(task.data[, i]))
-#       task.data[, i] = as.factor(task.data[, i])
-#   }
-#   task.data
-# }
-
-
-
-# Convert wide to long
+#' Convert wide to long
 to_long = function(res, lrn) {
   requireNamespace("tidyr")
   res = data.frame(res)
@@ -31,19 +14,7 @@ fix_prds_names = function(x) {
   return(x)
 }
 
-get_ranges_multi_baselearners = function(data_source, baselearners, measures, oml_task_ids) {
-  d = readRDS(data_source) %>% filter(!is.na(performance)) %>% ungroup()
-  ranges = lapply(measures, function(measure) {
-    d %>%
-      filter(measure == measure) %>%
-      filter(learner_id %in% paste0("mlr.classif.", baselearners)) %>%
-      filter(task_id %in% oml_task_ids) %>%
-      group_by(task_id) %>%
-      summarise(min = min(performance), max = max(performance))
-  })
-  names(ranges) = measures
-  return(ranges)
-}
+# Convert Param Types for use with mlr
 convertParamType = function(x, param_type) {
   if(param_type %in% c("integer", "numeric", "numericvector"))
     x = as.numeric(x)
@@ -95,3 +66,17 @@ out_of_parset_imputer = function(data, ps) {
   return(data)
 }
 
+#' Get performance ranges across multiple base learners
+get_ranges_multi_baselearners = function(data_source, baselearners, measures, oml_task_ids) {
+  d = readRDS(data_source) %>% filter(!is.na(performance)) %>% ungroup()
+  ranges = lapply(measures, function(measure) {
+    d %>%
+      filter(measure == measure) %>%
+      filter(learner_id %in% paste0("mlr.classif.", baselearners)) %>%
+      filter(task_id %in% oml_task_ids) %>%
+      group_by(task_id) %>%
+      summarise(min = min(performance), max = max(performance))
+  })
+  names(ranges) = measures
+  return(ranges)
+}
