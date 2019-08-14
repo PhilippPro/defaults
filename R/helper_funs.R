@@ -46,12 +46,12 @@ out_of_parset_imputer = function(data, ps) {
   return(data)
 }
 
-
 #' Get holdout performance from unscaled surrogates
 get_holdout_perf = function(sc, defaults.params, oml_task_id) {
   df = data.frame(unlist(sc$predict(defaults.params, oml_task_id)))
   colnames(df) = paste0(oml_task_id, "_auc")
   return(df)
+}
 
 #' Get performance ranges across multiple base learners
 get_ranges_multi_baselearners = function(data_source, baselearners, measures, oml_task_ids) {
@@ -73,7 +73,8 @@ get_ranges_multi_baselearners = function(data_source, baselearners, measures, om
 #' @description
 #' Loading data from RDS
 #'
-#' @param self :: `R6()`\cr
+#' @param self :: `R6()`
+# export
 load_from_rds = function(self) {
   # Load and rename column
   data = as.data.table(readRDS(self$data_source))
