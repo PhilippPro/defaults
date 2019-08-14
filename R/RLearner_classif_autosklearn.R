@@ -39,7 +39,6 @@ makeRLearner.classif.autosklearn = function() {
 
 #' @export
 trainLearner.classif.autosklearn = function(.learner, .task, .subset, .weights = NULL, ...) {
-
   autosklearn = import("autosklearn")
   classifier = autosklearn$classification$AutoSklearnClassifier(...)
   browser()

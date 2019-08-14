@@ -8,7 +8,6 @@ load_all("../surrogates") # library(surrogates)
 registerDoParallel(12)
 
 # -----------  Constants  -------------------------------------------------------
-seed = 190700
 n_defaults = 16
 measures = "auc"
 aggfun = "mean"
@@ -159,21 +158,31 @@ res_xgb_def_t = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% 
 # -----------  Parameters----------------------------
 # mean vs median: mean works better (by ~0.5%)
 sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
-res_xgb_mean = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
+res_xgb_median = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
-  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, "mean")
+  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, "median")
   ds$search_defaults()
   ds$save_to_disk()
   ds$get_holdout_performance()
 }
 
-# 10^4 vs 10^5 points: mean works better (by ~0.5%)
 sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
-res_xgb_mean = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
+res_xgb_median = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
-  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, aggfun, learner_prefix = "100k")
-  ds$ctrl$points = 10^5
+  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, "mix")
   ds$search_defaults()
   ds$save_to_disk()
   ds$get_holdout_performance()
+}
+
+
+# 10^4 vs 10^5 points: mean works better (by ~0.5%)
+sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
+res_xgb_100k = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
+  # Search  Defaults, hold out task x
+  ds = DefaultSearch$new(sc_xgb, 8, oml_task_id, aggfun, learner_prefix = "100k")
+  ds$ctrl$points = 10^5
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()[1:8, , drop = FALSE]
 }

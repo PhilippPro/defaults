@@ -35,9 +35,13 @@ compare_baslearners = list("glmnet" = res_glmnet, "ranger" = res_ranger, "svm" =
 plot_res(compare_baslearners)
 
 
-xgb_timesense = list("xgboost" = res_xgb, "xgb_time" = res_xgb_mean)
-rbind_res(xgb_timesense) %>% spread(method, auc) %>% group_by(iter) %>% summarize(mean(xgb_time - xgboost))
+xgb_timesense = list("xgboost" = res_xgb, "xgb_time" = res_xgb_median)
+rbind_res(xgb_timesense) %>% spread(method, auc) %>% group_by(iter) %>% summarize(mean(xgb_time - xgboost), mean(xgb_time > xgboost))
 plot_res(xgb_timesense)
+
+
+xgb_timesense = list("k100" = res_xgb_100k, "k10" = res_xgb_mean)
+rbind_res(xgb_timesense) %>% spread(method, auc) %>% group_by(iter) %>% summarize(mean(k100 - k10), mean(k100 > k10))
 
 
 ggsave(p, file = "figures/auc_eval_xgb_timesense_normal_rs.pdf")

@@ -42,7 +42,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       if (!is.null(self$holdout_task_id))
         self$sc$set_holdout_task(self$holdout_task_id)
 
-      self$aggfun = assert_choice(aggfun, choices = c("mean", "median"))
+      self$aggfun = assert_choice(aggfun, choices = c("mean", "median", "mix"))
       self$fail_handle = if(is.null(fail_handle)) fail::fail(self$fail_path(save_folder, learner_prefix)) else assert_path_for_output(fail_handle)
       self$ps = setNames(lapply(unique(self$sc$base_learners), get_param_set), unique(self$sc$base_learners))
       self$seed = assert_int(seed)
@@ -149,14 +149,15 @@ DefaultSearch = R6::R6Class("DefaultSearch",
 
     # Objective function for aggregation
     objfun = function(prds) {
-      fun = switch(self$aggfun, "mean" = mean, "median" = median)
+      mix = function(x) {(mean(x) + median(x)) / 2}
+      fun = switch(self$aggfun, "mean" = mean, "median" = median, "mix" = mix)
       lapply(prds, function(x) {
         # Invert perfs if measure is not maximized
         if (!self$maximize) x = -x
-        # Parallel minimum with current best
-        pmax = apply(x, 1, function(x) pmax(x, self$best.perfs))
+        # Parallel maximum with current best
+        pext = apply(x, 1, function(x) pmax(x, self$best.perfs))
         # Compute mean/medianpr
-        pmed = apply(pmax, 2, fun)
+        pmed = apply(pext, 2, fun)
       })
     },
 
