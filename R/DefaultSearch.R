@@ -16,6 +16,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
     sc = NULL,
     fail_handle = NULL,
     prefix = NULL,
+    seed = NULL,
     holdout_task_id = NULL,
     n_defaults = NULL,
     show.info = FALSE,
@@ -31,7 +32,9 @@ DefaultSearch = R6::R6Class("DefaultSearch",
     best.y = - Inf,
     aggfun = NULL,
 
-    initialize = function(sc, n_defaults = 10L, holdout_task_id, aggfun = "mean", fail_handle = NULL, save_folder = "data/intermediate", learner_prefix = NULL) {
+    initialize = function(sc, n_defaults = 10L, holdout_task_id, aggfun = "mean",
+      fail_handle = NULL, save_folder = "data/intermediate",
+      learner_prefix = NULL, seed = 190007) {
       self$sc = assert_class(sc, "SurrogateCollection")$clone()
       self$n_defaults = assert_int(n_defaults)
 
@@ -41,13 +44,16 @@ DefaultSearch = R6::R6Class("DefaultSearch",
 
       self$aggfun = assert_choice(aggfun, choices = c("mean", "median"))
       self$fail_handle = if(is.null(fail_handle)) fail::fail(self$fail_path(save_folder, learner_prefix)) else assert_path_for_output(fail_handle)
-      self$ps = setNames(lapply(unique(self$sc$baselearners), get_param_set), unique(self$sc$baselearners))
+      self$ps = setNames(lapply(unique(self$sc$base_learners), get_param_set), unique(self$sc$base_learners))
+      self$seed = assert_int(seed)
     },
+
     print = function(...) {
       catf("Default Search for %s defaults", self$n_defaults)
       if(!is.null(self$defaults.perf)) cat("Performances:\n"); print(self$defaults.perf)
       if(!is.null(self$defaults.params))  cat("Defaults:\n"); print(self$defaults.params)
     },
+
     defaults_to_csv = function() {
       stop("Not implemented yet!")
       if(is.null(self$defaults.params)) {
@@ -58,11 +64,15 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       }
     },
 
-    # Search defaults as specified.
-    search_defaults = function(overwrite = FALSE) {
-      # Search for optimal points given previous defaults
+    # Search for optimal points given previous defaults
+    search_defaults = function(overwrite = FALSE, save = TRUE) {
       assert_class(self$ctrl, "FocusSearchControl")
+      assert_flag(save)
+      assert_flag(overwrite)
 
+      # Seed for reproducibility
+      if (!is.null(self$seed)) set.seed(self$seed)
+      
       # Load defaults if saved.
       if (overwrite) self$clear()
       if (length(self$defaults.params) == 0L)
@@ -71,12 +81,13 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       # Compute n_defaults  default parameters iteratively
       # Defaults from earlier iterations influence later ones.
       for (j in seq_len(self$n_defaults)) {
+
         if (length(self$defaults.params) >= self$n_defaults) {
           messagef("Already found %s defaults!", self$n_defaults)
           break
         } else {
-          if (self$show.info)
-            catf("Searching for default %i/%i:", j, self$n_defaults)
+          if (j <= length(self$defaults.params)) next
+          if (self$show.info) catf("Searching for default %i/%i:", j, self$n_defaults)
         }
         z = self$do_random_search()
         if (z$y > self$best.y) {
@@ -94,13 +105,13 @@ DefaultSearch = R6::R6Class("DefaultSearch",
 
     # Do a random search on the surrogates
     do_random_search = function(rescale = FALSE) {
-      pts = self$generate_random_points(self$ctrl$points, unique(self$sc$baselearners))
+      pts = self$generate_random_points(self$ctrl$points, unique(self$sc$base_learners))
       prds = self$sc$predict(pts, rescale = rescale)
       prds = lapply(prds, fix_prds_names)
       # Compute the aggregation
       prds.agg = self$objfun(prds)
       assert_true(all(names(prds.agg) == names(prds)))
-
+      
       # Extract best base-learner and save the parameters
       best.bl = names(which.max(sapply(prds.agg, max)))
       best.idx = which.max(prds.agg[[best.bl]])
@@ -172,9 +183,9 @@ DefaultSearch = R6::R6Class("DefaultSearch",
     fail_path = function(folder, prefix) {
       assert_character(folder, null.ok = TRUE)
       assert_character(prefix, null.ok = TRUE)
-      lrns = paste0(unique(self$sc$baselearners), collapse = "_")
+      lrns = paste0(unique(self$sc$base_learners), collapse = "_")
       meas = paste0(unique(self$sc$measures), collapse = "_")
-      slrn = paste0(unique(self$sc$surrogate_learner), collapse = "_")
+      slrn = paste0(unique(self$sc$surrogate_learners), collapse = "_")
       scale = paste0(self$sc$scalings, collapse = "_")
       if (!is.null(prefix)) prefix = paste0(prefix, "_")
 

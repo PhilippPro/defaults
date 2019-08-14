@@ -1,4 +1,5 @@
-#' Return a list of specified surrogates
+#' Return a list of specified surrogates.
+#' If surrogates do not exist, trains and saves them, else loads them from disk.
 #' @param oml_task_ids  A vector of oml task ids for which we want to create surrogates. Defaults to all in get_oml_task_ids().
 #' @param baselearners  A vector of baselearners for which we want to create surrogates. Defaults to all in get_baselearners().
 #' @param measures      A vector of measures for which we want to create surrogates. Defaults to all in get_measures().

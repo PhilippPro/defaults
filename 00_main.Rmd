@@ -127,8 +127,7 @@ df2 = df %>%
 p = ggplot(df2, aes(x = id, y = auc, color = learner)) + geom_line() + facet_wrap(~task)
 ggsave("defaults_cummax.pdf", p, width = 20, height = 10)
 
-p2 = ggplot(pdf, aes(x = as.factor(id), y = auc_max, color = learner)) +
-  geom_boxplot()
+p2 = ggplot(pdf, aes(x = as.factor(id), y = auc_max, color = learner)) + geom_boxplot()
 ggsave("defaults_comparison.pdf", p2, width = 20, height = 10)
 }
 ```

@@ -3,15 +3,15 @@
 # The computation is quite expensive, thus we parallelize it to 19 cores.
 library(devtools)
 library(doParallel)
-library(surrogates)
 load_all()
-load_all("../surrogates")
-registerDoParallel(8)
+load_all("../surrogates") # library(surrogates)
+registerDoParallel(12)
 
 # -----------  Constants  -------------------------------------------------------
+seed = 190700
 n_defaults = 16
 measures = "auc"
-aggfun = "median"
+aggfun = "mean"
 oml_task_ids = get_oml_task_ids()
 
 
@@ -27,7 +27,6 @@ res_xgb = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 }
 
 # svm
-<<<<<<< HEAD
 sc_svm = make_surrogates_omlbot(baselearners = "svm", measures = measures)
 res_svm = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
@@ -38,7 +37,6 @@ res_svm = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 }
 
 # ranger
-<<<<<<< HEAD
 sc_ranger = make_surrogates_omlbot(baselearners = "ranger", measures = measures)
 res_ranger = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
@@ -49,7 +47,6 @@ res_ranger = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 }
 
 # glmnet
-<<<<<<< HEAD
 sc_glmnet = make_surrogates_omlbot(baselearners = "glmnet", measures = measures)
 res_glmnet = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
@@ -78,7 +75,7 @@ res_xgbt = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   ds = DefaultSearch$new(sc_xgbt, n_defaults, oml_task_id, aggfun)
   ds$search_defaults()
   ds$save_to_disk()
-  get_holdout_perf(sc_xgbt, ds$defaults.params, oml_task_id)
+  get_holdout_perf(sc_xgb, ds$defaults.params, oml_task_id)
 }
 
 # svm ~21 minutes
@@ -126,12 +123,8 @@ res_allt = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 
 # -----------  Runtime Prediction:--------------------------------------------------------
 sc_xgb_runtime = make_surrogates_omlbot(baselearners = "xgboost", measures = "runtime")
-<<<<<<< HEAD
 ds = DefaultSearch$new(sc_xgb_runtime, n_defaults, holdout_task_id = NULL, aggfun)
-=======
 
-ds = DefaultSearch$new(sc_xgb_runtime, 16L, holdout_task_id = NULL, "median")
->>>>>>> 26b37a046eaa20dc29f4cdcaf321e81860e8b2bd
 res_xgb_rs_t = foreach(n_points = seq_len(16), .combine = "rbind") %dopar% {
       res = replicate(30, { # 30 Replications to reduce stochasticity
         ds$ctrl$points = n_points
@@ -160,4 +153,27 @@ res_xgb_def_t = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% 
   df = data.frame(unlist(sc_xgb_runtime$predict(ds$defaults.params, oml_task_id)))
   colnames(df) = paste0(oml_task_id, "_auc")
   return(df)
+}
+
+
+# -----------  Parameters----------------------------
+# mean vs median: mean works better (by ~0.5%)
+sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
+res_xgb_mean = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
+  # Search  Defaults, hold out task x
+  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, "mean")
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}
+
+# 10^4 vs 10^5 points: mean works better (by ~0.5%)
+sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
+res_xgb_mean = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
+  # Search  Defaults, hold out task x
+  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, aggfun, learner_prefix = "100k")
+  ds$ctrl$points = 10^5
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
 }
