@@ -5,12 +5,12 @@ library(devtools)
 library(doParallel)
 load_all()
 load_all("../surrogates") # library(surrogates)
-registerDoParallel(12)
+registerDoParallel(13)
 
 # -----------  Constants  -------------------------------------------------------
 n_defaults = 16
 measures = "auc"
-aggfun = "mean"
+aggfun = "mix"
 oml_task_ids = get_oml_task_ids()
 
 
@@ -95,7 +95,7 @@ res_rangert = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   ds = DefaultSearch$new(sc_rangert, n_defaults, oml_task_id, aggfun)
   ds$search_defaults()
   ds$save_to_disk()
-  ds$evaluate_defaults_holdout()
+  get_holdout_perf(sc_ranger, ds$defaults.params, oml_task_id)
 }
 
 # glmnet
@@ -122,10 +122,10 @@ res_allt = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 
 # -----------  Runtime Prediction:--------------------------------------------------------
 sc_xgb_runtime = make_surrogates_omlbot(baselearners = "xgboost", measures = "runtime")
-ds = DefaultSearch$new(sc_xgb_runtime, n_defaults, holdout_task_id = NULL, aggfun)
 
+ds = DefaultSearch$new(sc_xgb_runtime, n_defaults, holdout_task_id = NULL, aggfun)
 res_xgb_rs_t = foreach(n_points = seq_len(16), .combine = "rbind") %dopar% {
-      res = replicate(30, { # 30 Replications to reduce stochasticity
+      res = replicate(10, { # Replications to reduce stochasticity
         ds$ctrl$points = n_points
         ds$do_random_search()$opt.prds
       })
@@ -139,7 +139,7 @@ res_xgb_tc_t = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   ds$save_to_disk()
   # Get holdout performance
   df = data.frame(unlist(sc_xgb_runtime$predict(ds$defaults.params, oml_task_id)))
-  colnames(df) = paste0(oml_task_id, "_auc")
+  colnames(df) = paste0(oml_task_id, "_runtime")
   return(df)
 }
 
@@ -150,39 +150,8 @@ res_xgb_def_t = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% 
   ds$save_to_disk()
   # Get holdout performance
   df = data.frame(unlist(sc_xgb_runtime$predict(ds$defaults.params, oml_task_id)))
-  colnames(df) = paste0(oml_task_id, "_auc")
+  colnames(df) = paste0(oml_task_id, "_runtime")
   return(df)
 }
 
 
-# -----------  Parameters----------------------------
-# mean vs median: mean works better (by ~0.5%)
-sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
-res_xgb_median = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
-  # Search  Defaults, hold out task x
-  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, "median")
-  ds$search_defaults()
-  ds$save_to_disk()
-  ds$get_holdout_performance()
-}
-
-sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
-res_xgb_median = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
-  # Search  Defaults, hold out task x
-  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, "mix")
-  ds$search_defaults()
-  ds$save_to_disk()
-  ds$get_holdout_performance()
-}
-
-
-# 10^4 vs 10^5 points: mean works better (by ~0.5%)
-sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
-res_xgb_100k = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
-  # Search  Defaults, hold out task x
-  ds = DefaultSearch$new(sc_xgb, 8, oml_task_id, aggfun, learner_prefix = "100k")
-  ds$ctrl$points = 10^5
-  ds$search_defaults()
-  ds$save_to_disk()
-  ds$get_holdout_performance()[1:8, , drop = FALSE]
-}

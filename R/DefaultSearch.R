@@ -154,7 +154,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       lapply(prds, function(x) {
         # Invert perfs if measure is not maximized
         if (!self$maximize) x = -x
-        # Parallel maximum with current best
+        # Parallel maximumf with current best
         pext = apply(x, 1, function(x) pmax(x, self$best.perfs))
         # Compute mean/medianpr
         pmed = apply(pext, 2, fun)
@@ -162,6 +162,9 @@ DefaultSearch = R6::R6Class("DefaultSearch",
     },
 
     evaluate_defaults_holdout = function(sc = NULL) {
+      # We can use an sc from the outside to evaluate.
+      # This is required for time-scaled surrogates
+      assert_class(sc, "SurrogateCollection", null.ok = TRUE)
       if (is.null(sc)) sc = self$sc
       if (is.null(self$holdout_task_id))
         stop("No holdout performance available, trained on all datasets!")
@@ -179,6 +182,12 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       } else {
         self$evaluate_defaults_holdout(sc)
       }
+    },
+
+    eval_runtime = function(sc_runtime) {
+      out = sc_runtime$predict(self$defaults.params)
+      res = do.call("rbind", lapply(out, fix_prds_names))
+      return(res)
     },
 
     fail_path = function(folder, prefix) {

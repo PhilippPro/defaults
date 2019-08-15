@@ -1,4 +1,4 @@
-# Reproducing the Multiple Defaults Search
+# Additional Insights
 
 ```{r, eval = FALSE}
 # Loading required packages.
@@ -6,12 +6,158 @@ library(devtools)
 load_all()
 ```
 
+This notebook covers some of the design choices made 
+during the development.
+
+## Aggregation Functions
+
+We compare three possible aggregation functions:
+**mean**, **median**, **mix**.
+**mix** is defined as $0.5 * mean + 0.5 * median$.
+
+Note: The default option "mix" can be found in 
+`02_calculate_defaults.R`.
+
+```{r}
+# mean vs median: mean works better (by ~0.5%)
+sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
+res_xgb_median = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
+  # Search  Defaults, hold out task x
+  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, "median")
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}
+
+# additionally test "mix" (mean + median) / 2: mix is better!
+sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
+res_xgb_mean = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
+  # Search  Defaults, hold out task x
+  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, "mean")
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}
+```
+
+And we visualize the results:
+
+```{r}
+xgb_aggfuns = list(
+  "xgb_mean" = res_xgb_mean,
+  "xgb_median" = res_xgb_median,
+  "xgb_mix"  = res_xgb)
+
+rbind_res(xgb_aggfuns) %>% spread(method, auc) %>% group_by(iter) %>% summarize(d_med = mean(xgb_median - xgb_mean), d_mix = mean(xgb_mix - xgb_mean), vs_med = mean(xgb_mean > xgb_median), vs_mix = mean(xgb_mean > xgb_mix), med_vs_mean = mean(xgb_median > xgb_mix))
+plot_res(xgb_aggfuns)
+```
+
+
+Conclusions:
+- mix > mean > median
+- For higher n, median becomes better, mix is still the
+  best for n = 16
+=> We will use "mix" as a default.
+
+
+## Random Search: Number of points
+
+The number of random search evals massively influences
+computation time for defaults.
+We parallelize across 12 cores and do leave-one-dataset-out CV.
+With 10k, finding 16 defaults takes ~ 21 minutes.
+For 100k: 210 minutes = ~ 3.5 hours.
+
+
+```{r}
+  library(tictoc) # Measure time
+  tic()
+  ds = DefaultSearch$new(sc_xgb, 16, NULL, "mix", learner_prefix = "full")
+  ds$search_defaults()
+  toc()
+```
+
+=> Finding 16 defaults on 38 datasets takes around
+   7.5 minutes using $10^4$ points on a single core.
+
+
+### Experiment 1
+
+We compare 10^4 vs 10^5 points using the mean as an
+aggregation function.
+
+```{r}
+sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
+res_xgb_100k = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
+  # Search  Defaults, hold out task x
+  ds = DefaultSearch$new(sc_xgb, 8, oml_task_id, "mean", learner_prefix = "100k")
+  ds$ctrl$points = 10^5
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()[1:8, , drop = FALSE]
+}
+```
+
+```{r}
+xgb_10k_vs_100k = list(
+  "k100" = res_xgb_100k,
+  "k10" = res_xgb_mean)
+
+rbind_res(xgb_10k_vs_100k) %>% 
+  spread(method, auc) %>% 
+  group_by(iter) %>% 
+  summarize(mean(k100 - k10), mean(k100 > k10))
+```
+
+
+### Experiment 2
+
+We compare 10k vs 20k points using "mix" aggregation function.
+
+```{r}
+sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
+res_xgb_20k = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
+  # Search  Defaults, hold out task x
+  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, "mix", learner_prefix = "20k")
+  ds$ctrl$points = 2*10^4
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}
+```
+
+```{r}
+sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
+res_xgb_1k = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
+  # Search  Defaults, hold out task x
+  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, "mix", learner_prefix = "1k")
+  ds$ctrl$points = 10^3
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}
+```
+
+
+```{r}
+xgb_10k_vs_20k = list(
+  "k20" = res_xgb_20k,
+  "k10" = res_xgb, 
+  "k1" = res_xgb_1k)
+
+rbind_res(xgb_10k_vs_20k) %>%
+  spread(method, auc) %>% 
+  group_by(iter) %>% 
+  summarize(mean(k20 - k10), mean(k20 > k10), mean(k1 > k10))
+```
+
+Conclusion: Higher number of points is favourable, 10k seems about as good as 20k though.
+
+## Performance versus Runtime
 
 ```{r, eval = FALSE}
 df = readRDS("data/input/oml_bot_data.RDS")
 ```
-
-## Performance versus Runtime
 
 ```{r}
 # Performance versus Runtime

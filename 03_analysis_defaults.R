@@ -1,30 +1,18 @@
-gather_res = function(res, method) {
-  res %>%
-    as_tibble() %>%
-    mutate(iter = row_number()) %>%
-    gather("dataset", "auc", -iter) %>%
-    mutate(method = method)
-}
+# xgboost
+res_xgb_rs = baseline_random_search(sc_xgb, 16L)
+res_defs = rbind_res(list("xgboost" = res_xgb, "xgb_time" = res_xgbt))
 
-rbind_res = function(lst) {
-  assert_list(lst, names = "named")
-  Reduce(bind_rows, Map(gather_res, res = lst, method = names(lst))) %>%
-  group_by(dataset, method) %>%
-  mutate(auc = cummax(auc), iter = iter) %>%
-  filter(iter %in% c(1, 2, 4, 8, 16))
-}
+res_xgb = res_xgb_rs %>%
+  bind_rows(res_defs) %>%
+  spread(method, auc)
 
-plot_res = function(lst) {
-    rbind_res(lst) %>%
-    ggplot(., aes(as.factor(iter), auc, fill = method)) +
-    geom_boxplot() +
-    theme_bw() +
-    xlab("Iteration")
-}
+res_xgb %>%
+  group_by(iter) %>%
+  summarize_if(is.numeric, median)
 
-xgb_timesense = list("xgboost" = res_xgb, "xgb_time" = res_xgbt)
-rbind_res(xgb_timesense) %>% spread(method, auc) %>% group_by(iter) %>% summarize(mean(xgb_time - xgboost))
-plot_res(xgb_timesense)
+plot_res(res_xgb)
+
+
 
 xgb_timesense = list("xgboost" = res_svm, "xgb_time" = res_svmt)
 rbind_res(xgb_timesense) %>% spread(method, auc) %>% group_by(iter) %>% summarize(mean(xgb_time - xgboost))
@@ -35,24 +23,25 @@ compare_baslearners = list("glmnet" = res_glmnet, "ranger" = res_ranger, "svm" =
 plot_res(compare_baslearners)
 
 
-xgb_timesense = list("xgboost" = res_xgb, "xgb_time" = res_xgb_median)
-rbind_res(xgb_timesense) %>% spread(method, auc) %>% group_by(iter) %>% summarize(mean(xgb_time - xgboost), mean(xgb_time > xgboost))
+xgb_timesense = list("xgb_mean" = res_xgb, "xgb_median" = res_xgb_median, "xgb_mix" = res_xgb_mix)
+rbind_res(xgb_timesense) %>% spread(method, auc) %>% group_by(iter) %>% summarize(d_med = mean(xgb_median - xgb_mean), d_mix = mean(xgb_mix - xgb_mean), vs_med = mean(xgb_mean > xgb_median), vs_mix = mean(xgb_mean > xgb_mix), med_vs_mean = mean(xgb_median > xgb_mix))
 plot_res(xgb_timesense)
 
-
-xgb_timesense = list("k100" = res_xgb_100k, "k10" = res_xgb_mean)
-rbind_res(xgb_timesense) %>% spread(method, auc) %>% group_by(iter) %>% summarize(mean(k100 - k10), mean(k100 > k10))
 
 
 ggsave(p, file = "figures/auc_eval_xgb_timesense_normal_rs.pdf")
 
 
-p = gather_res(res_xgb_def_t, "multi_default") %>%
+p = gather_res(res_xgb_def_t, "default") %>%
 bind_rows(gather_res(res_xgb_tc_t, "timesense")) %>%
 bind_rows(gather_res(res_xgb_rs_t, "random_search")) %>%
 group_by(dataset, method) %>%
 mutate(runtime_pct = cumsum(auc), iter = as.factor(iter)) %>%
 filter(iter %in% c(1, 2, 4, 8, 12, 16)) %>%
+ungroup()
+p %>%
 ggplot(., aes(iter, runtime_pct, fill = method)) + geom_boxplot()
 
 ggsave(p, file = "figures/runtime_eval_xgb_timesense_normal_rs.pdf")
+
+p %>% select(-auc) %>% spread(method, runtime_pct) %>% group_by(iter) %>% summarize_if(is.numeric, mean)
