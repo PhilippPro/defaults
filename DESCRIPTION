@@ -35,4 +35,5 @@ Remotes:
   pfistfl/focussearch,
   thomasp/patchwork,
   compstat-lmu/surrogates
-
+Suggests: 
+    testthat (>= 2.1.0)

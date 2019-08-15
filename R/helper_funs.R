@@ -104,7 +104,7 @@ load_from_arff = function(self) {
   data$performance[data$task_id == self$oml_task_id] = self$scaler$scale(data, oml_task_id = self$oml_task_id)
   # Subset columns, only relevant data
   self$param_names = intersect(getParamIds(self$param_set), colnames(data))
-  data = data[data$task_id == self$oml_task_id),  c("performance", self$param_names)]
+  data = data[data$task_id == self$oml_task_id,  c("performance", self$param_names)]
   # Impute NA's with out-of-paramset values
   data = out_of_parset_imputer(data, self$param_set)
   return(data)
