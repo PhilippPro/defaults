@@ -69,17 +69,17 @@ make_surrogates_sklearn = function(oml_task_ids, base_learners, surrogate_lrn,
   assert_true(all(base_learners %in% c("adaboost", "libsvm_svc", "random_forest")))
 
  # Make sure we aggregate correctly in case we have multiple baselearners:
-  if (length(baselearners) > 1L) {
+  if (length(base_learners) > 1L) {
     stop("Not implemented")
     # ranges = get_ranges_multi_baselearners(data_source, base_learners, measures, oml_task_ids)
   }
-  if (!timecrit) scaler = Scaler$new()
+  scaler = Scaler$new()
   surrs = foreach(oml_task_id = oml_task_ids, .combine = "c") %:%
-      foreach(base_learner = base_learners, .combine = "c") %dopar% {
+      foreach(base_learner = base_learners, .combine = "c") %do% {
         surrogates::Surrogate$new(
           oml_task_id = oml_task_id,
           base_learner = base_learner,
-          data_source = paste0(data_source, "/", base_learner),
+          data_source = paste0(data_source, "/", base_learner, ".arff"),
           eval_measure = "y",
           surrogate_learner = surrogate_lrn,
           load_fun = load_from_arff,

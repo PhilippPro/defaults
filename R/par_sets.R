@@ -8,8 +8,8 @@ get_param_set = function(lrn.cl) {
 
   if (stringi::stri_sub(lrn.cl, 1, 8) != "classif." & lrn.cl %in% get_mlr_baselearners())
     lrn.cl = stringi::stri_paste("classif.", lrn.cl)
-
-  if (!checkmate::check_choice(lrn.cl, c("classif.glmnet", "classif.rpart",
+  
+  if (!check_choice(lrn.cl, c("classif.glmnet", "classif.rpart",
     "classif.kknn", "classif.ranger", "classif.xgboost", "classif.svm", "adaboost",
     "libsvm_svc", "random_forest")))
     stop(sprintf("No parameter set for %s available, please supply a param set!", lrn))

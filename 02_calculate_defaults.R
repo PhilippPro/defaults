@@ -156,11 +156,18 @@ res_xgb_def_t = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% 
 
 
 # adaboost
-sc_xgb = make_surrogates_omlbot(baselearners = "adaboost", measures = measures)
-res_xgb = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
+sc_ada = make_surrogates_sklearn(oml_task_ids = get_sklearn_task_ids(), base_learners = "adaboost")
+res_ada = foreach(oml_task_id = get_sklearn_task_ids(), .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
-  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, aggfun)
+  ds = DefaultSearch$new(sc_ada, n_defaults, oml_task_id, aggfun)
+  ds$ctrl$points = 10^3
   ds$search_defaults()
   ds$save_to_disk()
   ds$get_holdout_performance()
 }
+rs = baseline_random_search(sc_ada)
+res = gather_res(res_ada, method = "defaults") %>% group_by(dataset) %>% mutate(auc = cummax(auc)) %>% bind_rows(rs)
+
+res %>%
+  group_by(method) 
+  spread("method", "auc") %>% group_by(iter) %>% summarize_if(is.numeric, mean)
