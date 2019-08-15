@@ -165,6 +165,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       # We can use an sc from the outside to evaluate.
       # This is required for time-scaled surrogates
       assert_class(sc, "SurrogateCollection", null.ok = TRUE)
+      assert_list(self$defaults.params, min.len = 1)
       if (is.null(sc)) sc = self$sc
       if (is.null(self$holdout_task_id))
         stop("No holdout performance available, trained on all datasets!")
