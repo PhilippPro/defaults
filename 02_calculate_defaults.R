@@ -155,3 +155,12 @@ res_xgb_def_t = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% 
 }
 
 
+# adaboost
+sc_xgb = make_surrogates_omlbot(baselearners = "adaboost", measures = measures)
+res_xgb = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
+  # Search  Defaults, hold out task x
+  ds = DefaultSearch$new(sc_xgb, n_defaults, oml_task_id, aggfun)
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}

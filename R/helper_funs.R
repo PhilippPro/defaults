@@ -88,3 +88,24 @@ load_from_rds = function(self) {
   data = out_of_parset_imputer(data, self$param_set)
   return(data)
 }
+
+#' @title Reading data
+#'
+#' @description
+#' Loading data from RDS
+#'
+#' @param self :: `R6()`
+# export
+load_from_arff = function(self) {
+  # Load and rename column
+  data = as.data.table(farff::readARFF(self$data_source))
+  colnames(data)[colnames(data) == self$eval_measure] = "performance"
+  # Scale performance column
+  data$performance[data$task_id == self$oml_task_id] = self$scaler$scale(data, oml_task_id = self$oml_task_id)
+  # Subset columns, only relevant data
+  self$param_names = intersect(getParamIds(self$param_set), colnames(data))
+  data = data[data$task_id == self$oml_task_id),  c("performance", self$param_names)]
+  # Impute NA's with out-of-paramset values
+  data = out_of_parset_imputer(data, self$param_set)
+  return(data)
+}
