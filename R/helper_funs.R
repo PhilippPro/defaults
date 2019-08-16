@@ -34,15 +34,18 @@ out_of_parset_imputer = function(data, ps) {
     else if (x$type %in% c("factor", "logical"))
       return("_NA_")
   })
-  data[, nacols] = sapply(nacols, function(x) {
-    # Convert logicals to factors
-    if (is.logical(data[[x]])) data[[x]] = as.character(data[[x]])
-    # Replace NA's
-    data[is.na(data[[x]]), x] = out_vals[x]
-    # character -> factor
-    if (is.character(data[[x]])) data[[x]] = as.factor(data[[x]])
-    return(data[[x]])
-  })
+  if (!is.null(nacols)) {
+    data = data.frame(data)
+    data[, nacols] = sapply(nacols, function(x) {
+      # Convert logicals to factors
+      if (is.logical(data[[x]])) data[[x]] = as.character(data[[x]])
+      # Replace NA's
+      data[is.na(data[[x]]), x] = out_vals[x]
+      # character -> factor
+      if (is.character(data[[x]])) data[[x]] = as.factor(data[[x]])
+      return(data[[x]])
+    })
+  }
   return(data)
 }
 
@@ -76,6 +79,7 @@ get_ranges_multi_baselearners = function(data_source, baselearners, measures, om
 #' @param self :: `R6()`
 # export
 load_from_rds = function(self) {
+  requireNamespace("data.table")
   # Load and rename column
   data = as.data.table(readRDS(self$data_source))
   colnames(data)[colnames(data) == self$eval_measure] = "performance"
@@ -83,7 +87,7 @@ load_from_rds = function(self) {
   data$performance[data$task_id == self$oml_task_id] = self$scaler$scale(data, oml_task_id = self$oml_task_id, runtime = "runtime")
   # Subset columns, only relevant data
   self$param_names = intersect(getParamIds(self$param_set), colnames(data))
-  data = data[(data$task_id == self$oml_task_id) & (data$learner_id == paste0("mlr.classif.", self$base_learner)),  c("performance", self$param_names)]
+  data = data[(data$task_id == self$oml_task_id) & (data$learner_id == paste0("mlr.classif.", self$base_learner)),  c("performance", self$param_names), with = FALSE]
   # Impute NA's with out-of-paramset values
   data = out_of_parset_imputer(data, self$param_set)
   return(data)

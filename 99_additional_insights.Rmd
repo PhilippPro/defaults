@@ -155,6 +155,38 @@ Conclusion: Higher number of points is favourable, 10k seems about as good as 20
 
 ## Performance versus Runtime
 
+
+We want to trade-off performance and runtime. 
+We currently use the following formula:
+
+$acc_{scaled} / log(rt_{scaled} + base, base = base)^{power}$
+
+```{r}
+registerDoParallel(10)
+# Speedup: Only on 5 datasets
+sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", 
+  measures = "auc")
+sc_xgb$surrogates[6:38] = NULL                         
+
+res = foreach (power = c(0.1, 0.5, 1, 2)) %:%
+  foreach(base = c(1, exp(1), 10)) %do% {
+  sct = make_surrogates_omlbot(get_oml_task_ids()[1:5],
+    baselearners = "xgboost", measures = "auc",
+    data_source = "data/input/oml_bot_xgb_sample.RDS",
+    scaler = ScalerTimeCrit$new(base = base, power = power))
+  foreach(oml_task_id = get_oml_task_ids()[1:5], .combine = "cbind") %do% {
+    # Search  Defaults, hold out task x
+    ds = DefaultSearch$new(sct, 4, oml_task_id)
+    ds$ctrl$points = 200
+    ds$search_defaults()
+    get_holdout_perf(sc_xgb, ds$defaults.params, oml_task_id)
+}}
+
+lapply(res, function(x) sapply(x, function(y) {apply(y, 1, mean)}))
+```
+
+
+
 ```{r, eval = FALSE}
 df = readRDS("data/input/oml_bot_data.RDS")
 ```
