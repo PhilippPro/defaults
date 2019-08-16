@@ -5,9 +5,13 @@
 #' @param measures      A vector of measures for which we want to create surrogates. Defaults to all in get_measures().
 #' @param surrogate_lrn A mlr [Learner]. Defaults to "regr.fixcubist".
 #' @export
-make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogate_lrn,
+make_surrogates_omlbot = function(
+  oml_task_ids = get_oml_task_ids(),
+  baselearners = get_baselearners(),
+  measures = get_measures(),
+  surrogate_lrn,
   data_source = "data/input/oml_bot_data.RDS", save_path = "data/intermediate/",
-  timecrit = FALSE, scaler = NULL) {
+  scaler = surrogates::Scaler$new()) {
 
   if (missing(surrogate_lrn)) {
     # Obtain fixed cubist from the internet
@@ -15,27 +19,16 @@ make_surrogates_omlbot = function(oml_task_ids, baselearners, measures, surrogat
     # surrogate_lrn = mlr::makeLearner("regr.fixcubist", committees = 20, extrapolation = 0)
     surrogate_lrn = mlr::makeLearner("regr.ranger", num.trees = 40L)
   }
-  if (missing(oml_task_ids))
-    oml_task_ids = get_oml_task_ids()
-  if (missing(baselearners))
-    baselearners = get_baselearners()
-  if (missing(measures))
-    measures = get_measures()
 
- # Make sure we aggregate correctly in case we have multiple baselearners:
-  if (length(baselearners) > 1L) {
-    ranges = get_ranges_multi_baselearners(data_source, baselearners, measures, oml_task_ids)
-  }
+  # Make sure we aggregate correctly in case we have multiple baselearners,
+  # use a global list of min/max performances for each task.
+  ranges = readRDS("data/input/oml_mlr_ranges.RDS")
 
-  assert_flag(timecrit)
-  if (is.null(scaler)) { 
-    if (!timecrit) scaler = Scaler$new()
-    else scaler = ScalerTimeCrit$new()
-  }
-  
   surrs = foreach(measure_name = measures, .combine = "c") %:%
     foreach(oml_task_id = oml_task_ids, .combine = "c") %:%
       foreach(base_learner = baselearners, .combine = "c") %dopar% {
+        if (measure_name != "runtime")
+          scaler$set_values(ranges[[measure_name]][ranges[[measure_name]]$task_id == oml_task_id, c("min", "max"),])
         surrogates::Surrogate$new(
           oml_task_id = oml_task_id,
           base_learner = base_learner,
@@ -77,7 +70,7 @@ make_surrogates_sklearn = function(oml_task_ids, base_learners, surrogate_lrn,
   }
   scaler = Scaler$new()
   surrs = foreach(oml_task_id = oml_task_ids, .combine = "c") %:%
-      foreach(base_learner = base_learners, .combine = "c") %do% {
+      foreach(base_learner = base_learners, .combine = "c") %dopar% {
         surrogates::Surrogate$new(
           oml_task_id = oml_task_id,
           base_learner = base_learner,

@@ -5,7 +5,7 @@ library(devtools)
 library(doParallel)
 load_all()
 load_all("../surrogates") # library(surrogates)
-registerDoParallel(13)
+registerDoParallel(8)
 
 # -----------  Constants  -------------------------------------------------------
 n_defaults = 16
@@ -68,7 +68,7 @@ res_all = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 # -----------  Optimizing AUC scaled by runtime for different learners:-------------------
 
 # xgboost
-sc_xgbt = make_surrogates_omlbot(baselearners = "xgboost", measures = measures, timecrit = TRUE)
+sc_xgbt = make_surrogates_omlbot(baselearners = "xgboost", measures = measures, scaler = ScalerTimeCrit$new())
 res_xgbt = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
   ds = DefaultSearch$new(sc_xgbt, n_defaults, oml_task_id, aggfun)
@@ -78,7 +78,7 @@ res_xgbt = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 }
 
 # svm ~21 minutes
-sc_svmt = make_surrogates_omlbot(baselearners = "svm", measures = measures, timecrit = TRUE)
+sc_svmt = make_surrogates_omlbot(baselearners = "svm", measures = measures, scaler = ScalerTimeCrit$new())
 res_svmt = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
   ds = DefaultSearch$new(sc_svmt, n_defaults, oml_task_id, aggfun)
@@ -89,7 +89,7 @@ res_svmt = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 
 
 # ranger
-sc_rangert = make_surrogates_omlbot(baselearners = "ranger", measures = measures, timecrit = TRUE)
+sc_rangert = make_surrogates_omlbot(baselearners = "ranger", measures = measures, scaler = ScalerTimeCrit$new())
 res_rangert = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
   ds = DefaultSearch$new(sc_rangert, n_defaults, oml_task_id, aggfun)
@@ -99,7 +99,7 @@ res_rangert = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 }
 
 # glmnet
-sc_glmnett = make_surrogates_omlbot(baselearners = "glmnet", measures = measures, timecrit = TRUE)
+sc_glmnett = make_surrogates_omlbot(baselearners = "glmnet", measures = measures, scaler = ScalerTimeCrit$new())
 res_glmnett = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
   ds = DefaultSearch$new(sc_glmnett, n_defaults, oml_task_id, aggfun)
@@ -109,7 +109,8 @@ res_glmnett = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 }
 
 # Defaults across all learners
-sc_allt = make_surrogates_omlbot(baselearners = c("svm", "xgboost", "ranger", "glmnet", "rpart"), measures = measures, timecrit = TRUE)
+sc_allt = make_surrogates_omlbot(baselearners = c("svm", "xgboost", "ranger", "glmnet", "rpart"),
+  measures = measures, scaler = ScalerTimeCrit$new())
 res_allt = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
   ds = DefaultSearch$new(sc_allt, n_defaults, holdout_task_id = oml_task_id, aggfun)
@@ -165,9 +166,34 @@ res_ada = foreach(oml_task_id = get_sklearn_task_ids(), .combine = "cbind") %dop
   ds$save_to_disk()
   ds$get_holdout_performance()
 }
+
+sc_libsvm_svc = make_surrogates_sklearn(oml_task_ids = get_sklearn_task_ids(), base_learners = "libsvm_svc")
+res_libsvm_svc = foreach(oml_task_id = get_sklearn_task_ids(), .combine = "cbind") %dopar% {
+  # Search  Defaults, hold out task x
+  ds = DefaultSearch$new(sc_libsvm_svc, n_defaults, oml_task_id, aggfun)
+  ds$ctrl$points = 10^3
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}
+
+sc_random_forest = make_surrogates_sklearn(oml_task_ids = get_sklearn_task_ids(), base_learners = "random_forest")
+res_random_forest = foreach(oml_task_id = get_sklearn_task_ids(), .combine = "cbind") %dopar% {
+  # Search  Defaults, hold out task x
+  ds = DefaultSearch$new(sc_random_forest, n_defaults, oml_task_id, aggfun)
+  ds$ctrl$points = 10^3
+  ds$search_defaults()
+  ds$save_to_disk()
+  ds$get_holdout_performance()
+}
+
+library(tidyr)
+library(tibble)
+library(dplyr)
 rs = baseline_random_search(sc_ada)
 res = gather_res(res_ada, method = "defaults") %>% group_by(dataset) %>% mutate(auc = cummax(auc)) %>% bind_rows(rs)
 
 res %>%
-  group_by(method) 
+  group_by(method) %>%
+  filter(iter %in% c(1, 2, 4, 8, 16)) %>%
   spread("method", "auc") %>% group_by(iter) %>% summarize_if(is.numeric, mean)

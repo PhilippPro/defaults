@@ -6,7 +6,7 @@ library(devtools)
 load_all()
 ```
 
-This notebook covers some of the design choices made 
+This notebook covers some of the design choices made
 during the development.
 
 ## Aggregation Functions
@@ -15,7 +15,7 @@ We compare three possible aggregation functions:
 **mean**, **median**, **mix**.
 **mix** is defined as $0.5 * mean + 0.5 * median$.
 
-Note: The default option "mix" can be found in 
+Note: The default option "mix" can be found in
 `02_calculate_defaults.R`.
 
 ```{r}
@@ -103,9 +103,9 @@ xgb_10k_vs_100k = list(
   "k100" = res_xgb_100k,
   "k10" = res_xgb_mean)
 
-rbind_res(xgb_10k_vs_100k) %>% 
-  spread(method, auc) %>% 
-  group_by(iter) %>% 
+rbind_res(xgb_10k_vs_100k) %>%
+  spread(method, auc) %>%
+  group_by(iter) %>%
   summarize(mean(k100 - k10), mean(k100 > k10))
 ```
 
@@ -142,12 +142,12 @@ res_xgb_1k = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 ```{r}
 xgb_10k_vs_20k = list(
   "k20" = res_xgb_20k,
-  "k10" = res_xgb, 
+  "k10" = res_xgb,
   "k1" = res_xgb_1k)
 
 rbind_res(xgb_10k_vs_20k) %>%
-  spread(method, auc) %>% 
-  group_by(iter) %>% 
+  spread(method, auc) %>%
+  group_by(iter) %>%
   summarize(mean(k20 - k10), mean(k20 > k10), mean(k1 > k10))
 ```
 
@@ -156,7 +156,7 @@ Conclusion: Higher number of points is favourable, 10k seems about as good as 20
 ## Performance versus Runtime
 
 
-We want to trade-off performance and runtime. 
+We want to trade-off performance and runtime.
 We currently use the following formula:
 
 $acc_{scaled} / log(rt_{scaled} + base, base = base)^{power}$
@@ -164,12 +164,12 @@ $acc_{scaled} / log(rt_{scaled} + base, base = base)^{power}$
 ```{r}
 registerDoParallel(10)
 # Speedup: Only on 5 datasets
-sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", 
+sc_xgb = make_surrogates_omlbot(baselearners = "xgboost",
   measures = "auc")
-sc_xgb$surrogates[6:38] = NULL                         
+sc_xgb$surrogates[6:38] = NULL
 
-res = foreach (power = c(0.1, 0.5, 1, 2)) %:%
-  foreach(base = c(1, exp(1), 10)) %do% {
+res = foreach (power = c(0.1, 1, 2)) %:%
+  foreach(base = c(1.01, exp(1), 10)) %do% {
   sct = make_surrogates_omlbot(get_oml_task_ids()[1:5],
     baselearners = "xgboost", measures = "auc",
     data_source = "data/input/oml_bot_xgb_sample.RDS",
@@ -182,7 +182,30 @@ res = foreach (power = c(0.1, 0.5, 1, 2)) %:%
     get_holdout_perf(sc_xgb, ds$defaults.params, oml_task_id)
 }}
 
-lapply(res, function(x) sapply(x, function(y) {apply(y, 1, mean)}))
+agg_mean = lapply(res, function(x) sapply(x, function(y) {apply(apply(y, 2, cummax), 1, mean)}))
+agg_mean = sapply(agg_mean, function(x) x[4,])
+colnames(agg_mean) = c(0.1, 1, 2)
+rownames(agg_mean) = c(1.01, exp(1), 10)
+
+
+# Results (The following seems to work well)
+# Base 1.01 Power 0.1
+#      10   Power 0.1
+#      e    Power 1
+
+res = foreach (power = c(0.01, 0.1, 0.5, 1, 2)) %:%
+  foreach(oml_task_id = get_oml_task_ids()[1:5], .combine = "cbind") %do% {
+    sct = make_surrogates_omlbot(get_oml_task_ids()[1:5],
+    baselearners = "xgboost", measures = "auc",
+    data_source = "data/input/oml_bot_xgb_sample.RDS",
+    scaler = ScalerTimeCrit$new(base = 1, power = power))
+    # Search  Defaults, hold out task x
+    ds = DefaultSearch$new(sct, 4, oml_task_id)
+    ds$ctrl$points = 1000
+    ds$search_defaults()
+    get_holdout_perf(sc_xgb, ds$defaults.params, oml_task_id)
+}
+lapply(res, function(x) apply(x, 1, mean))
 ```
 
 
@@ -253,9 +276,9 @@ We compute a performance criterion (see comments below) and look for a point tha
 We then compare to the fastest configuration that achieved the maximum AUC.
 
 ```{r}
+df = readRDS("data/input/oml_bot_xgb_sample.RDS")
 # Convert to data.table for speedup
-dt = as.data.table(df)[!is.na(performance) & !is.na(runtime) , .(runtime = runtime + 1, performance, measure, learner_id, data_id)]
-dt = dt[runtime > 0, ]
+dt = as.data.table(df)[!is.na(performance) & !is.na(runtime) , .(runtime, performance, measure, learner_id, task_id)]
 
 
 
@@ -263,23 +286,26 @@ dt = dt[runtime > 0, ]
 # we scale the denominator (runtime).
 
 dtout = data.table()
-for (bs in c(1.001, 1.01, 2, 5, 10, 20)) {
-for (pow in c(0.01, 0.1, 0.5, 1, 2, 10)) {
-  dt2 = dt[measure == "auc" & learner_id == "mlr.classif.rpart", .(perf_by_time = performance / log(runtime + bs, base = bs)^pow, performance, runtime), by = .(data_id)]
+for (base in c(1.001, 1.01, 2, exp(1), 10)) {
+for (power in c(0.1, 0.5, 1, 2)) {
+
+  dt2 = dt[, .(perf = BBmisc::normalize(performance, method = "range"), runtime = runtime/max(runtime)), by = .(task_id)]
+  dt2 = dt2[, .(perf, runtime, task_id, perf_by_time = perf / log(runtime + base, base = base)^power)]
+
 
   dt3 = merge(
-    dt2[, .(performance, runtime, perf_by_time, pbt = max(perf_by_time)), by = .(data_id)][perf_by_time == pbt, ],
-    dt2[, .(runtime, performance, pm = max(performance)), by = .(data_id)][performance == pm,],
-    by = "data_id"
+    dt2[, .(perf, runtime, perf_by_time, pbt = max(perf_by_time)), by = .(task_id)][perf_by_time == pbt, ],
+    dt2[, .(perf, runtime, pm = max(perf)), by = .(task_id)][perf == pm,],
+    by = "task_id"
   )
 
   dtn = merge(
-    dt3[, .(runtime_pct = runtime.x / runtime.y, perf_pct = performance.x / performance.y, data_id)],
-    dt3[, .(max_runtime_pct = max(runtime.x / runtime.y)), by = "data_id"],
-    by = "data_id"
+    dt3[, .(runtime_pct = runtime.x / runtime.y, perf_pct = perf.x / perf.y, task_id)],
+    dt3[, .(max_runtime_pct = max(runtime.x / runtime.y)), by = "task_id"],
+    by = "task_id"
   )
-  dtout = rbind(dtout, dtn[max_runtime_pct == runtime_pct,][, .(perf_pct = mean(perf_pct), runtime_pct = mean(runtime_pct))])
-}
+  dtout = rbind(dtout, dtn[max_runtime_pct == runtime_pct,][, .(perf_pct = mean(perf_pct), runtime_pct = mean(runtime_pct), base = base, power = power)])
+  }
 }
 
 p = ggplot(dtout, aes(perf_pct, runtime_pct)) + geom_point()  + geom_line() + xlab("Percent of max auc") + ylab("Percent of runtime to achieve best auc")
@@ -294,4 +320,39 @@ ggsave(p,  file = "../perf_vs_runtime_rpart.pdf")
 #   perf_pct runtime_pct
 #    0.9643     0.08621
 # => We can get 96.43% of avg performance for 8.6% of computation time
+
+
+
+dtout = data.table()
+for (power in c(0.001, 0.01, 0.1, 0.5, 1, 2)) {
+
+  dt2 = dt[, .(perf = BBmisc::normalize(performance, method = "range"), runtime = runtime/max(runtime)), by = .(task_id)]
+  dt2 = dt2[, .(perf, runtime, task_id, perf_by_time = perf / (runtime^power))]
+
+
+  dt3 = merge(
+    dt2[, .(perf, runtime, perf_by_time, pbt = max(perf_by_time)), by = .(task_id)][perf_by_time == pbt, ],
+    dt2[, .(perf, runtime, pm = max(perf)), by = .(task_id)][perf == pm,],
+    by = "task_id"
+  )
+
+  dtn = merge(
+    dt3[, .(runtime_pct = runtime.x / runtime.y, perf_pct = perf.x / perf.y, task_id)],
+    dt3[, .(max_runtime_pct = max(runtime.x / runtime.y)), by = "task_id"],
+    by = "task_id"
+  )
+  dtout = rbind(dtout, dtn[max_runtime_pct == runtime_pct,][, .(perf_pct = mean(perf_pct), runtime_pct = mean(runtime_pct), power = power)])
+}
+dtout
+
+p = ggplot(dtout, aes(perf_pct, runtime_pct)) + geom_point()  + geom_line() + xlab("Percent of max auc") + ylab("Percent of runtime to achieve best auc")
+ggsave(p,  file = "../perf_vs_runtime_rpart.pdf")
+```
+
+
+## Creating performance ranges
+
+```{r}
+ranges = get_ranges_multi_baselearners("data/input/oml_bot_data.RDS", get_mlr_baselearners(), get_measures(), get_oml_task_ids())
+saveRDS(lapply(ranges, as.data.frame), "data/input/oml_mlr_ranges.RDS")
 ```

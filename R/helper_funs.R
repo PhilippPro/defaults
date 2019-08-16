@@ -51,6 +51,7 @@ out_of_parset_imputer = function(data, ps) {
 
 #' Get holdout performance from unscaled surrogates
 get_holdout_perf = function(sc, defaults.params, oml_task_id) {
+  assert_class(sc, "SurrogateCollection")
   df = data.frame(unlist(sc$predict(defaults.params, oml_task_id)))
   colnames(df) = paste0(oml_task_id, "_auc")
   return(df)
@@ -58,16 +59,14 @@ get_holdout_perf = function(sc, defaults.params, oml_task_id) {
 
 #' Get performance ranges across multiple base learners
 get_ranges_multi_baselearners = function(data_source, baselearners, measures, oml_task_ids) {
-  d = readRDS(data_source) %>% filter(!is.na(performance)) %>% ungroup()
-  ranges = lapply(measures, function(measure) {
-    d %>%
-      filter(measure == measure) %>%
-      filter(learner_id %in% paste0("mlr.classif.", baselearners)) %>%
-      filter(task_id %in% oml_task_ids) %>%
-      group_by(task_id) %>%
-      summarise(min = min(performance), max = max(performance))
-  })
-  names(ranges) = measures
+  requireNamespace("dplyr")
+  d = readRDS(data_source)
+  d = d %>% dplyr::filter(!is.na(performance)) %>% dplyr::ungroup()
+  ranges = d %>%
+      dplyr::filter(learner_id %in% paste0("mlr.classif.", baselearners)) %>%
+      dplyr::filter(task_id %in% oml_task_ids) %>%
+      dplyr::group_by(task_id, measure) %>%
+      dplyr::summarise(min = min(performance), max = max(performance))
   return(ranges)
 }
 
@@ -81,7 +80,7 @@ get_ranges_multi_baselearners = function(data_source, baselearners, measures, om
 load_from_rds = function(self) {
   requireNamespace("data.table")
   # Load and rename column
-  data = as.data.table(readRDS(self$data_source))
+  data = data.table::as.data.table(readRDS(self$data_source))
   colnames(data)[colnames(data) == self$eval_measure] = "performance"
   # Scale performance column
   data$performance[data$task_id == self$oml_task_id] = self$scaler$scale(data, oml_task_id = self$oml_task_id, runtime = "runtime")
@@ -102,7 +101,7 @@ load_from_rds = function(self) {
 # export
 load_from_arff = function(self) {
   # Load and rename column
-  data = as.data.table(farff::readARFF(self$data_source))
+  data = data.table::as.data.table(farff::readARFF(self$data_source))
   colnames(data)[colnames(data) == self$eval_measure] = "performance"
   # Scale performance column
   data$performance[data$task_id == self$oml_task_id] = self$scaler$scale(data, oml_task_id = self$oml_task_id)

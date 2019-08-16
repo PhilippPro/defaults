@@ -11,29 +11,30 @@ Depends:
   R6,
   mlr (>= 2.10),
   ParamHelpers (>= 1.8),
-  OpenML (>= 1.2),
-  batchtools (>= 0.9.0),
   BBmisc (>= 1.10),
-  dplyr (>= 0.5.0),
   checkmate (>= 1.8.0),
-  tidyr (>= 0.6.1),
   stringi (>= 1.1.2),
-  ggplot2,
-  farff,
   foreach,
   doRNG,
-  devtools,
   doParallel,
-  roxygen2,
-  Cubist,
-  glmnet,
-  ranger,
-  xgboost,
-  e1071,
-  kknn
+  data.table
 Remotes:
   pfistfl/focussearch,
   thomasp/patchwork,
   compstat-lmu/surrogates
-Suggests: 
-    testthat (>= 2.1.0)
+Suggests:
+    devtools,
+    testthat (>= 2.1.0),
+    roxygen2,
+    OpenML (>= 1.2),
+    tidyr (>= 0.6.1),
+    farff,
+    batchtools (>= 0.9.0),
+    dplyr (>= 0.5.0),
+    ggplot2,
+    Cubist,
+    glmnet,
+    ranger,
+    xgboost,
+    e1071,
+    kknn

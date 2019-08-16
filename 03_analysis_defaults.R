@@ -1,3 +1,8 @@
+library(tidyr)
+library(tibble)
+library(dplyr)
+library(ggplot2)
+
 # xgboost
 res_xgb_rs = baseline_random_search(sc_xgb, 16L)
 res_defs = rbind_res(list("xgboost" = res_xgb, "xgb_time" = res_xgbt))
@@ -20,8 +25,10 @@ plot_res(xgb_timesense)
 
 compare_baslearners = list("glmnet" = res_glmnet, "ranger" = res_ranger, "svm" = res_svm,
   "xgboost" = res_xgb,  "all_learners" = res_all)
-plot_res(compare_baslearners)
+plot_res(rbind_res(compare_baslearners))
 
+
+gather_res(res_glmnet, method = "glmnet")
 
 xgb_timesense = list("xgb_mean" = res_xgb, "xgb_median" = res_xgb_median, "xgb_mix" = res_xgb_mix)
 rbind_res(xgb_timesense) %>% spread(method, auc) %>% group_by(iter) %>% summarize(d_med = mean(xgb_median - xgb_mean), d_mix = mean(xgb_mix - xgb_mean), vs_med = mean(xgb_mean > xgb_median), vs_mix = mean(xgb_mean > xgb_mix), med_vs_mean = mean(xgb_median > xgb_mix))
