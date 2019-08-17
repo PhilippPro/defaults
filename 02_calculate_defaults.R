@@ -3,8 +3,8 @@
 # The computation is quite expensive, thus we parallelize it to 19 cores.
 library(devtools)
 library(doParallel)
+load_all("../surrogates")
 load_all()
-load_all("../surrogates") # library(surrogates)
 registerDoParallel(8)
 
 # -----------  Constants  -------------------------------------------------------

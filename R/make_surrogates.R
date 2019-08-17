@@ -28,7 +28,7 @@ make_surrogates_omlbot = function(
     foreach(oml_task_id = oml_task_ids, .combine = "c") %:%
       foreach(base_learner = baselearners, .combine = "c") %dopar% {
         if (measure_name != "runtime")
-          scaler$set_values(ranges[[measure_name]][ranges[[measure_name]]$task_id == oml_task_id, c("min", "max"),])
+          scaler_ms = scaler$clone()$set_values(ranges[[measure_name]][ranges[[measure_name]]$task_id == oml_task_id, c("min", "max"),])
         surrogates::Surrogate$new(
           oml_task_id = oml_task_id,
           base_learner = base_learner,
@@ -38,7 +38,7 @@ make_surrogates_omlbot = function(
           load_fun = load_from_rds,
           param_set = get_param_set(paste0("classif.", base_learner)),
           save_path = save_path,
-          scaler = scaler)$train()
+          scaler = scaler_ms)$train()
 
   }
   sc = surrogates::SurrogateCollection$new(surrs)
@@ -68,9 +68,8 @@ make_surrogates_sklearn = function(oml_task_ids, base_learners, surrogate_lrn,
     stop("Not implemented")
     # ranges = get_ranges_multi_baselearners(data_source, base_learners, measures, oml_task_ids)
   }
-  scaler = Scaler$new()
   surrs = foreach(oml_task_id = oml_task_ids, .combine = "c") %:%
-      foreach(base_learner = base_learners, .combine = "c") %dopar% {
+      foreach(base_learner = base_learners, .combine = "c") %do% {
         surrogates::Surrogate$new(
           oml_task_id = oml_task_id,
           base_learner = base_learner,
@@ -80,7 +79,7 @@ make_surrogates_sklearn = function(oml_task_ids, base_learners, surrogate_lrn,
           load_fun = load_from_arff,
           param_set = get_param_set(base_learner),
           save_path = "data/intermediate/",
-          scaler = scaler)$train()
+          scaler = Scaler$new())$train()
   }
   sc = surrogates::SurrogateCollection$new(surrs)
   return(sc)
