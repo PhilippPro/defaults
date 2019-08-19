@@ -4,48 +4,31 @@ library(dplyr)
 library(ggplot2)
 library(patchwork)
 
-# -----------  SKLEARN   -----------------------------------------------------------------
 
-plot_results = function(sc, res, title) {
-  res = gather_with_rs(sc, res)
-  plot_res(res, title)
-}
+# Comparison to Random Search
+#-----------------------------------------------------------------------------------------
+# sklearn
+plot_results_vs_rs(sc_ada, res_ada, "adaboost") +
+plot_results_vs_rs(sc_libsvm_svc, res_libsvm_svc, "libsvm_svc") +
+plot_results_vs_rs(sc_random_forest, res_random_forest, "random_forest")
 
-plot_results(sc_ada, res_ada, "adaboost") +
-plot_results(sc_libsvm_svc, res_libsvm_svc, "libsvm_svc") +
-plot_results(sc_random_forest, res_random_forest, "random_forest")
+# mlr
+plot_results_vs_rs(sc_xgb, res_xgb, "xgboost") +
+plot_results_vs_rs(sc_svm, res_svm, "svm") +
+plot_results_vs_rs(sc_ranger, res_ranger, "ranger") +
+plot_results_vs_rs(sc_glmnet, res_glmnet, "glmnet")
 
-# -----------  MLR  -----------------------------------------------------------------
-
-
-
-
+plot_results_vs_rs(sc_all, res_all, "All learners")
 
 
-res %>%
-  group_by(method) %>%
+# Single learners vs aggregates
+#-----------------------------------------------------------------------------------------
+gather_res(res_xgb, method = "xgboost") %>%
+  bind_rows(gather_res(res_ranger, method = "ranger")) %>%
+  bind_rows(gather_res(res_all, method = "all")) %>%
   filter(iter %in% c(1, 2, 4, 8, 16)) %>%
-  spread("method", "auc") %>% group_by(iter) %>% summarize_if(is.numeric, mean)
+  plot_res("Comparison across learners")
 
-
-library(tidyr)
-library(tibble)
-library(dplyr)
-library(ggplot2)
-
-# xgboost
-res_xgb_rs = baseline_random_search(sc_xgb, 16L)
-res_defs = rbind_res(list("xgboost" = res_xgb, "xgb_time" = res_xgbt))
-
-res_xgb = res_xgb_rs %>%
-  bind_rows(res_defs) %>%
-  spread(method, auc)
-
-res_xgb %>%
-  group_by(iter) %>%
-  summarize_if(is.numeric, median)
-
-plot_res(res_xgb)
 
 
 

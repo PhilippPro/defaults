@@ -32,3 +32,8 @@ gather_with_rs = function(sc, res) {
     filter(iter %in% c(1, 2, 4, 8, 16)) %>%
     bind_rows(rs)
 }
+
+plot_results_vs_rs = function(sc, res, title) {
+  res = gather_with_rs(sc, res)
+  plot_res(res, title)
+}

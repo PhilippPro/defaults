@@ -4,7 +4,7 @@ library(devtools)
 library(doParallel)
 load_all("../surrogates")
 load_all()
-registerDoParallel(8)
+registerDoParallel(4)
 
 # -----------  Constants  ----------------------------------------------------------------
 n_defaults = 16

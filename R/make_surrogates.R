@@ -39,7 +39,6 @@ make_surrogates_omlbot = function(
           param_set = get_param_set(paste0("classif.", base_learner)),
           save_path = save_path,
           scaler = scaler_ms)$train()
-
   }
   sc = surrogates::SurrogateCollection$new(surrs)
   return(sc)

@@ -72,7 +72,7 @@ DefaultSearch = R6::R6Class("DefaultSearch",
 
       # Seed for reproducibility
       if (!is.null(self$seed)) set.seed(self$seed)
-      
+
       # Load defaults if saved.
       if (overwrite) self$clear()
       if (length(self$defaults.params) == 0L)
@@ -111,10 +111,13 @@ DefaultSearch = R6::R6Class("DefaultSearch",
       # Compute the aggregation
       prds.agg = self$objfun(prds)
       assert_true(all(names(prds.agg) == names(prds)))
-      
+
       # Extract best base-learner and save the parameters
       best.bl = names(which.max(sapply(prds.agg, max)))
       best.idx = which.max(prds.agg[[best.bl]])
+
+      if (length(best.bl) != 1) browser()
+      if (length(best.idx) != 1) browser()
       list(
         y = prds.agg[[best.bl]][best.idx],
         opt.prds = prds[[best.bl]][best.idx, , drop = FALSE],
@@ -124,9 +127,9 @@ DefaultSearch = R6::R6Class("DefaultSearch",
 
     # Draw random configurations for a set of baselearners
     generate_random_points = function(npoints, baselearners) {
-      bl_props = round(npoints / length(baselearners))
-      nd = lapply(baselearners, function(x) {
+      bl_props = ceiling(npoints / length(baselearners))
 
+      nd = lapply(baselearners, function(x) {
         # Generate random points for a given baselearner.
         newdesign = generateRandomDesign(bl_props, self$ps[[x]], trafo = TRUE)
         newdesign = out_of_parset_imputer(newdesign, self$ps[[x]])
