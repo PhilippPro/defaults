@@ -1,3 +1,33 @@
+library(tibble)
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(patchwork)
+
+# -----------  SKLEARN   -----------------------------------------------------------------
+
+plot_results = function(sc, res, title) {
+  res = gather_with_rs(sc, res)
+  plot_res(res, title)
+}
+
+plot_results(sc_ada, res_ada, "adaboost") +
+plot_results(sc_libsvm_svc, res_libsvm_svc, "libsvm_svc") +
+plot_results(sc_random_forest, res_random_forest, "random_forest")
+
+# -----------  MLR  -----------------------------------------------------------------
+
+
+
+
+
+
+res %>%
+  group_by(method) %>%
+  filter(iter %in% c(1, 2, 4, 8, 16)) %>%
+  spread("method", "auc") %>% group_by(iter) %>% summarize_if(is.numeric, mean)
+
+
 library(tidyr)
 library(tibble)
 library(dplyr)

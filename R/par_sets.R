@@ -1,14 +1,14 @@
 #' Get the param set for a given learner.
 #'
 #' Paramsets define the space in which we want to search for defaults.
-#' @param lrn.cl [`character`] learner.id.
+#' @param lrn.cl [`character`] learner.id [sklearn or mlr learner]
 #' @export
 get_param_set = function(lrn.cl) {
   assert_string(lrn.cl)
 
   if (stringi::stri_sub(lrn.cl, 1, 8) != "classif." & lrn.cl %in% get_mlr_baselearners())
     lrn.cl = stringi::stri_paste("classif.", lrn.cl)
-  
+
   if (!check_choice(lrn.cl, c("classif.glmnet", "classif.rpart",
     "classif.kknn", "classif.ranger", "classif.xgboost", "classif.svm", "adaboost",
     "libsvm_svc", "random_forest")))

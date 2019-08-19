@@ -1,5 +1,4 @@
 # This file computes the defaults for a given learner.
-
 # The computation is quite expensive, thus we parallelize it to 19 cores.
 library(devtools)
 library(doParallel)
@@ -7,14 +6,14 @@ load_all("../surrogates")
 load_all()
 registerDoParallel(8)
 
-# -----------  Constants  -------------------------------------------------------
+# -----------  Constants  ----------------------------------------------------------------
 n_defaults = 16
 measures = "auc"
 aggfun = "mix"
 oml_task_ids = get_oml_task_ids()
 
 
-# -----------  Optimizing AUC for different learners:----------------------------
+# -----------  Optimizing AUC for different learners:-------------------------------------
 # xgboost
 sc_xgb = make_surrogates_omlbot(baselearners = "xgboost", measures = measures)
 res_xgb = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
@@ -121,7 +120,7 @@ res_allt = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 
 
 
-# -----------  Runtime Prediction:--------------------------------------------------------
+# -----------  Runtime Prediction  -------------------------------------------------------
 sc_xgb_runtime = make_surrogates_omlbot(baselearners = "xgboost", measures = "runtime")
 
 ds = DefaultSearch$new(sc_xgb_runtime, n_defaults, holdout_task_id = NULL, aggfun)
@@ -155,7 +154,7 @@ res_xgb_def_t = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% 
   return(df)
 }
 
-
+# -----------  SKLEARN   -----------------------------------------------------------------
 # adaboost
 sc_ada = make_surrogates_sklearn(oml_task_ids = get_sklearn_task_ids(), base_learners = "adaboost")
 res_ada = foreach(oml_task_id = get_sklearn_task_ids(), .combine = "cbind") %dopar% {
@@ -167,6 +166,7 @@ res_ada = foreach(oml_task_id = get_sklearn_task_ids(), .combine = "cbind") %dop
   ds$get_holdout_performance()
 }
 
+# libsvm_svc
 sc_libsvm_svc = make_surrogates_sklearn(oml_task_ids = get_sklearn_task_ids(), base_learners = "libsvm_svc")
 res_libsvm_svc = foreach(oml_task_id = get_sklearn_task_ids(), .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
@@ -177,8 +177,11 @@ res_libsvm_svc = foreach(oml_task_id = get_sklearn_task_ids(), .combine = "cbind
   ds$get_holdout_performance()
 }
 
-sc_random_forest = make_surrogates_sklearn(oml_task_ids = get_sklearn_task_ids(), base_learners = "random_forest")
-res_random_forest = foreach(oml_task_id = get_sklearn_task_ids(), .combine = "cbind") %dopar% {
+# random_forest (results are only available for ~90/100 datasets)
+df_rf = farff::readARFF("data/input/sklearn_oml100/random_forest.arff")
+oml_task_ids = get_sklearn_task_ids()[get_sklearn_task_ids() %in% unique(df_rf$task_id)]
+sc_random_forest = make_surrogates_sklearn(oml_task_ids = oml_task_ids, base_learners = "random_forest")
+res_random_forest = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
   # Search  Defaults, hold out task x
   ds = DefaultSearch$new(sc_random_forest, n_defaults, oml_task_id, aggfun)
   ds$ctrl$points = 10^3
@@ -187,13 +190,3 @@ res_random_forest = foreach(oml_task_id = get_sklearn_task_ids(), .combine = "cb
   ds$get_holdout_performance()
 }
 
-library(tidyr)
-library(tibble)
-library(dplyr)
-rs = baseline_random_search(sc_ada)
-res = gather_res(res_ada, method = "defaults") %>% group_by(dataset) %>% mutate(auc = cummax(auc)) %>% bind_rows(rs)
-
-res %>%
-  group_by(method) %>%
-  filter(iter %in% c(1, 2, 4, 8, 16)) %>%
-  spread("method", "auc") %>% group_by(iter) %>% summarize_if(is.numeric, mean)

@@ -70,6 +70,7 @@ get_ranges_multi_baselearners = function(data_source, baselearners, measures, om
   return(ranges)
 }
 
+
 #' @title Reading data
 #'
 #' @description
@@ -91,6 +92,7 @@ load_from_rds = function(self) {
   data = out_of_parset_imputer(data, self$param_set)
   return(data)
 }
+
 
 #' @title Reading data
 #'

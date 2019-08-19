@@ -45,10 +45,11 @@ make_surrogates_omlbot = function(
   return(sc)
 }
 
+
 #' Return a list of specified surrogates.
 #' If surrogates do not exist, trains and saves them, else loads them from disk.
 #' @param oml_task_ids  A vector of oml task ids for which we want to create surrogates. Defaults to all in get_oml_task_ids().
-#' @param baselearners  A vector of baselearners for which we want to create surrogates. Defaults to all in get_baselearners().
+#' @param base_learners  A vector of baselearners for which we want to create surrogates. Defaults to all in get_baselearners().
 #' @param measures      A vector of measures for which we want to create surrogates. Defaults to all in get_measures().
 #' @param surrogate_lrn A mlr [Learner]. Defaults to "regr.fixcubist".
 #' @export
@@ -68,6 +69,7 @@ make_surrogates_sklearn = function(oml_task_ids, base_learners, surrogate_lrn,
     stop("Not implemented")
     # ranges = get_ranges_multi_baselearners(data_source, base_learners, measures, oml_task_ids)
   }
+
   surrs = foreach(oml_task_id = oml_task_ids, .combine = "c") %:%
       foreach(base_learner = base_learners, .combine = "c") %do% {
         surrogates::Surrogate$new(

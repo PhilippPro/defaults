@@ -1,4 +1,3 @@
-
 rbind_res = function(lst) {
   assert_list(lst, names = "named")
   Reduce(bind_rows, Map(gather_res, res = lst, method = names(lst))) %>%
@@ -15,11 +14,21 @@ gather_res = function(res, method) {
     mutate(method = method)
 }
 
-plot_res = function(lst) {
+plot_res = function(lst, title) {
     lst %>%
     mutate(auc = as.numeric(auc)) %>%
     ggplot(., aes(as.factor(iter), auc, fill = method)) +
     geom_boxplot() +
     theme_bw() +
-    xlab("Iteration")
+    xlab("Iteration") +
+    ggtitle(title)
+}
+
+gather_with_rs = function(sc, res) {
+  rs = baseline_random_search(sc)
+  gather_res(res, method = "defaults") %>%
+    group_by(dataset) %>%
+    mutate(auc = cummax(auc)) %>%
+    filter(iter %in% c(1, 2, 4, 8, 16)) %>%
+    bind_rows(rs)
 }
