@@ -32,6 +32,13 @@ gather_res(res_xgb, method = "xgboost") %>%
 
 
 
+
+ls = list.files("data/intermediate/surrogates/xgboost/ranger_surrogate/auc/range_timecrit_b_1p_0.5")
+
+get_oml_task_ids()[!(get_oml_task_ids() %in% as.numeric(stringi::stri_extract(ls, regex = "[0-9][0-9]*")))]
+
+
+
 xgb_timesense = list("xgboost" = res_svm, "xgb_time" = res_svmt)
 rbind_res(xgb_timesense) %>% spread(method, auc) %>% group_by(iter) %>% summarize(mean(xgb_time - xgboost))
 plot_res(xgb_timesense)

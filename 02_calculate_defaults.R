@@ -122,6 +122,11 @@ res_allt = foreach(oml_task_id = oml_task_ids, .combine = "cbind") %dopar% {
 
 # -----------  Runtime Prediction  -------------------------------------------------------
 sc_xgb_runtime = make_surrogates_omlbot(baselearners = "xgboost", measures = "runtime")
+sc_svm_runtime = make_surrogates_omlbot(baselearners = "svm",     measures = "runtime")
+sc_ranger_runtime = make_surrogates_omlbot(baselearners = "ranger",  measures = "runtime")
+sc_glmnet_runtime = make_surrogates_omlbot(baselearners = "glmnet",  measures = "runtime")
+sc_xgb_runtime = make_surrogates_omlbot(baselearners = c("svm", "xgboost", "ranger", "glmnet", "rpart"), measures = "runtime")
+
 
 ds = DefaultSearch$new(sc_xgb_runtime, n_defaults, holdout_task_id = NULL, aggfun)
 res_xgb_rs_t = foreach(n_points = seq_len(16), .combine = "rbind") %dopar% {

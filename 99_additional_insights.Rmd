@@ -355,4 +355,27 @@ ggsave(p,  file = "../perf_vs_runtime_rpart.pdf")
 ```{r}
 ranges = get_ranges_multi_baselearners("data/input/oml_bot_data.RDS", get_mlr_baselearners(), get_measures(), get_oml_task_ids())
 saveRDS(lapply(ranges, as.data.frame), "data/input/oml_mlr_ranges.RDS")
+# Add runtime
+d = readRDS("data/input/oml_bot_data.RDS")
+d = d %>% dplyr::filter(!is.na(performance)) %>% dplyr::ungroup()
+ranges = d %>%
+    dplyr::filter(task_id %in% get_oml_task_ids()) %>%
+    dplyr::group_by(task_id, measure) %>%
+    dplyr::mutate(runtime = runtime + abs(min(0, runtime)) + 1) %>%
+    dplyr::filter(measure == "acc") %>%
+    dplyr::summarise(min = min(runtime), max = max(runtime)) %>%
+    dplyr::select(-measure) %>%
+    as.data.frame()
+
+dd = readRDS("data/input/oml_mlr_ranges.RDS")
+dd[["runtime"]] = ranges
+saveRDS(dd, "data/input/oml_mlr_ranges.RDS")
+
+
+
+library(dplyr)
+d %>% dplyr::filter(learner_id == "mlr.classif.xgboost") %>%
+ filter(task_id %in% get_oml_task_ids()) %>% group_by(task_id) %>% tally() %>% data.frame()
+get
+
 ```

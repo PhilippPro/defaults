@@ -23,13 +23,13 @@ make_surrogates_omlbot = function(
   # Make sure we aggregate correctly in case we have multiple baselearners,
   # use a global list of min/max performances for each task.
   ranges = readRDS("data/input/oml_mlr_ranges.RDS")
-
   surrs = foreach(measure_name = measures, .combine = "c") %:%
     foreach(oml_task_id = oml_task_ids, .combine = "c") %:%
-      foreach(base_learner = baselearners, .combine = "c") %dopar% {
-        if (measure_name != "runtime")
-          scaler_ms = scaler$clone()$set_values(ranges[[measure_name]][ranges[[measure_name]]$task_id == oml_task_id, c("min", "max"),])
-        surrogates::Surrogate$new(
+      foreach(base_learner = baselearners, .combine = "c") %do% {
+        scaler_ms = scaler$clone()$set_values(ranges[[measure_name]][ranges[[measure_name]]$task_id == oml_task_id, c("min", "max"),])
+        if ("ScalerTimeCrit" %in% class(scaler_ms))
+          scaler_ms$set_runtime_values(ranges[["runtime"]][ranges[["runtime"]]$task_id == oml_task_id, c("min", "max"),])
+        s = surrogates::Surrogate$new(
           oml_task_id = oml_task_id,
           base_learner = base_learner,
           data_source = data_source,
@@ -39,6 +39,7 @@ make_surrogates_omlbot = function(
           param_set = get_param_set(paste0("classif.", base_learner)),
           save_path = save_path,
           scaler = scaler_ms)$train()
+        return(s)
   }
   sc = surrogates::SurrogateCollection$new(surrs)
   return(sc)
